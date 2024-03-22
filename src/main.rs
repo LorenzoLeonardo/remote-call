@@ -1,8 +1,9 @@
+mod list;
 mod socket;
 
 use tokio::net::TcpListener;
 
-use crate::socket::Socket;
+use crate::{list::ClientList, socket::Socket};
 
 pub const ENV_LOGGER: &str = "RUST_LOG";
 
@@ -42,29 +43,56 @@ pub fn setup_logger() {
 
 async fn main() {
     setup_logger();
+    start_server().await;
+}
+
+async fn start_server() {
     let listener = TcpListener::bind("127.0.0.1:1986").await.unwrap();
 
     log::trace!("Server listening on {}", "127.0.0.1:1986");
+    let list_client = ClientList::new();
+
     loop {
         let (socket, addr) = listener.accept().await.unwrap();
         let socket = Socket::new(socket, addr);
+
+        let mut list = list_client.clone();
         tokio::spawn(async move {
             log::trace!("Connected: {}", socket.ip_address());
+
+            list.add(socket.ip_address(), socket.clone()).await;
             loop {
                 let mut data = Vec::new();
 
-                if (socket.read(&mut data).await).is_err() {
-                    break;
+                match socket.read(&mut data).await {
+                    Ok(usize) => {
+                        if usize == 0 {
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        log::error!("{:?}", err);
+                        break;
+                    }
                 }
-                log::trace!("Result Read: {:?}", data);
 
-                if (socket.write("Hoy".as_bytes()).await).is_err() {
-                    break;
-                } else {
-                    log::trace!("Result Send: Ok");
-                }
+                log::trace!("Result Read: {:?}", data);
+                broad_cast(&list, data.as_slice(), &socket.ip_address()).await;
             }
             log::trace!("Disconnected: {}", socket.ip_address());
+
+            list.remove(&socket.ip_address()).await;
         });
+    }
+}
+
+async fn broad_cast(list: &ClientList, data: &[u8], sender: &str) {
+    let list = list.iter().await;
+    for (ip, socket) in list.iter() {
+        if ip != sender {
+            let res = socket.write(data).await;
+
+            log::info!("Broadcast to {}: {:?}", ip, res);
+        }
     }
 }
