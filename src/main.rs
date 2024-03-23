@@ -1,4 +1,3 @@
-mod list;
 mod message;
 mod objects;
 mod socket;
@@ -9,7 +8,6 @@ use atticus::run_actor;
 use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::{
-    list::ClientList,
     message::{MessageType, SocketMessage},
     objects::{ListObjects, RequestListObjects},
     socket::Socket,
@@ -60,7 +58,6 @@ async fn start_server() {
     let listener = TcpListener::bind("127.0.0.1:1986").await.unwrap();
 
     log::trace!("Server listening on {}", "127.0.0.1:1986");
-    let list_client = ClientList::new();
     let list_call_object = Arc::new(Mutex::new(HashMap::<u32, Socket>::new()));
 
     let res = run_actor(ListObjects::new(), 2);
@@ -69,12 +66,10 @@ async fn start_server() {
         let (socket, addr) = listener.accept().await.unwrap();
         let socket = Socket::new(socket, addr);
         let list_object_requestor = res.requestor.clone();
-        let mut list = list_client.clone();
         let inner_list_call_object = list_call_object.clone();
         tokio::spawn(async move {
             log::trace!("Connected: {}", socket.ip_address());
 
-            list.add(socket.ip_address(), socket.clone()).await;
             loop {
                 let mut data = Vec::new();
 
@@ -157,23 +152,8 @@ async fn start_server() {
                         )
                     }
                 }
-                //log::trace!("Result Read: {:?}", data);
-                //broad_cast(&list, data.as_slice(), &socket.ip_address()).await;
             }
             log::trace!("Disconnected: {}", socket.ip_address());
-
-            list.remove(&socket.ip_address()).await;
         });
-    }
-}
-
-async fn broad_cast(list: &ClientList, data: &[u8], sender: &str) {
-    let list = list.iter().await;
-    for (ip, socket) in list.iter() {
-        if ip != sender {
-            let res = socket.write(data).await;
-
-            log::info!("Broadcast to {}: {:?}", ip, res);
-        }
     }
 }
