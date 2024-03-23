@@ -1,10 +1,19 @@
 mod list;
 mod message;
+mod objects;
 mod socket;
 
-use tokio::net::TcpListener;
+use std::{collections::HashMap, sync::Arc};
 
-use crate::{list::ClientList, socket::Socket};
+use atticus::run_actor;
+use tokio::{net::TcpListener, sync::Mutex};
+
+use crate::{
+    list::ClientList,
+    message::{MessageType, SocketMessage},
+    objects::{ListObjects, RequestListObjects},
+    socket::Socket,
+};
 
 pub const ENV_LOGGER: &str = "RUST_LOG";
 
@@ -52,12 +61,16 @@ async fn start_server() {
 
     log::trace!("Server listening on {}", "127.0.0.1:1986");
     let list_client = ClientList::new();
+    let list_call_object = Arc::new(Mutex::new(HashMap::<u32, Socket>::new()));
+
+    let res = run_actor(ListObjects::new(), 2);
 
     loop {
         let (socket, addr) = listener.accept().await.unwrap();
         let socket = Socket::new(socket, addr);
-
+        let list_object_requestor = res.requestor.clone();
         let mut list = list_client.clone();
+        let inner_list_call_object = list_call_object.clone();
         tokio::spawn(async move {
             log::trace!("Connected: {}", socket.ip_address());
 
@@ -77,8 +90,75 @@ async fn start_server() {
                     }
                 }
 
-                log::trace!("Result Read: {:?}", data);
-                broad_cast(&list, data.as_slice(), &socket.ip_address()).await;
+                match serde_json::from_slice::<SocketMessage>(data.as_slice()) {
+                    Ok(mut msg) => match msg.kind() {
+                        MessageType::AddShareObjectRequest => {
+                            log::info!("AddShareObjectRequest: {:?}", msg);
+                            let _ = list_object_requestor
+                                .request(RequestListObjects::Add(msg, socket.clone()))
+                                .await;
+                        }
+                        MessageType::AddShareObjectResponse => {
+                            log::info!("AddShareObjectResponse: {:?}", msg);
+                        }
+                        MessageType::RemoteCallRequest => {
+                            log::info!("RemoteCallRequest: {:?}", msg);
+                            let mut lst = inner_list_call_object.lock().await;
+                            let id = lst.len() as u32;
+                            msg = msg.set_id(id);
+                            lst.insert(id, socket.clone());
+
+                            let _ = list_object_requestor
+                                .request(RequestListObjects::CallMethod(msg))
+                                .await;
+                        }
+                        MessageType::RemoteCallResponse => {
+                            log::info!("RemoteCallResponse: {:?}", msg);
+
+                            let mut lst = inner_list_call_object.lock().await;
+                            if let Some(remote) = lst.get(&msg.id()) {
+                                match serde_json::to_vec(&msg) {
+                                    Ok(data) => match remote.write(&data).await {
+                                        Ok(_res) => {
+                                            lst.remove(&msg.id());
+                                        }
+                                        Err(err) => {
+                                            log::error!("{:?}", err);
+                                        }
+                                    },
+                                    Err(_) => todo!(),
+                                }
+                            }
+                        }
+                        MessageType::SendEventRequest => {
+                            log::info!("SendEventRequest: {:?}", msg);
+                        }
+                        MessageType::SendEventResponse => {
+                            log::info!("SendEventResponse: {:?}", msg);
+                        }
+                        MessageType::RegisterEventRequest => {
+                            log::info!("RegisterEventRequest: {:?}", msg);
+                        }
+                        MessageType::RegisterEventResponse => {
+                            log::info!("RegisterEventResponse: {:?}", msg);
+                        }
+                        MessageType::RemoveShareObjectRequest => {
+                            log::info!("RemoveShareObjectRequest: {:?}", msg);
+                        }
+                        MessageType::RemoveShareObjectResponse => {
+                            log::info!("RemoveShareObjectResponse: {:?}", msg);
+                        }
+                    },
+                    Err(error) => {
+                        log::error!(
+                            "Invalid message from {}: {}",
+                            socket.ip_address(),
+                            error.to_string()
+                        )
+                    }
+                }
+                //log::trace!("Result Read: {:?}", data);
+                //broad_cast(&list, data.as_slice(), &socket.ip_address()).await;
             }
             log::trace!("Disconnected: {}", socket.ip_address());
 
