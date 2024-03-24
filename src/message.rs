@@ -1,8 +1,9 @@
 use json_elem::jsonelem::JsonElem;
 use serde::{Deserialize, Serialize, Serializer};
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
 pub enum MessageType {
+    #[default]
     AddShareObjectRequest,
     AddShareObjectResponse,
     RemoteCallRequest,
@@ -13,12 +14,6 @@ pub enum MessageType {
     RegisterEventResponse,
     RemoveShareObjectRequest,
     RemoveShareObjectResponse,
-}
-
-impl Default for MessageType {
-    fn default() -> Self {
-        MessageType::AddShareObjectRequest
-    }
 }
 
 impl Serialize for MessageType {
