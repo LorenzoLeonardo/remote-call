@@ -154,6 +154,9 @@ async fn start_server() {
                 }
             }
             log::trace!("Disconnected: {}", socket.ip_address());
+            let _ = list_object_requestor
+                .request(RequestListObjects::Remove(socket.clone()))
+                .await;
         });
     }
 }

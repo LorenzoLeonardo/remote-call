@@ -17,7 +17,7 @@ pub struct ListObjects {
 
 pub enum RequestListObjects {
     Add(SocketMessage, Socket),
-    Remove(SocketMessage),
+    Remove(Socket),
     CallMethod(SocketMessage),
 }
 
@@ -50,19 +50,13 @@ impl ListObjects {
         }
     }
 
-    pub fn remove(&mut self, msg: SocketMessage) -> SocketMessage {
-        match String::from_utf8(msg.body().into()) {
-            Ok(object) => {
-                self.objects.remove(&object);
-                msg.set_body("success".as_bytes())
-                    .set_kind(MessageType::RemoveShareObjectResponse)
-            }
-            Err(err) => {
-                log::error!("ListObjects::remove(): {:?}", err);
-                msg.set_body("failed".as_bytes())
-                    .set_kind(MessageType::RemoveShareObjectResponse)
-            }
-        }
+    pub fn remove(&mut self, socket: Socket) -> SocketMessage {
+        self.objects
+            .retain(|_key, value| value.ip_address() != socket.ip_address());
+
+        self.events
+            .retain(|_key, value| value.ip_address() != socket.ip_address());
+        SocketMessage::new().set_kind(MessageType::RemoveShareObjectResponse)
     }
 
     pub async fn call_method(&mut self, msg: SocketMessage) -> SocketMessage {
