@@ -7,7 +7,7 @@ use tokio::{net::TcpListener, sync::Mutex};
 
 use remote_call::{
     message::{MessageType, SocketMessage},
-    socket::Socket,
+    socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
 };
 
 use crate::objects::{ListObjects, RequestListObjects};
@@ -54,9 +54,10 @@ async fn main() {
 }
 
 async fn start_server() {
-    let listener = TcpListener::bind("127.0.0.1:1986").await.unwrap();
+    let server_address = std::env::var(ENV_SERVER_ADDRESS).unwrap_or(SERVER_ADDRESS.to_owned());
+    let listener = TcpListener::bind(server_address.as_str()).await.unwrap();
 
-    log::trace!("Server listening on {}", "127.0.0.1:1986");
+    log::trace!("Server listening on {}", server_address);
     let list_call_object = Arc::new(Mutex::new(HashMap::<u32, Socket>::new()));
 
     let res = run_actor(ListObjects::new(), 2);
