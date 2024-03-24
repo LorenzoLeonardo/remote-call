@@ -1,3 +1,4 @@
+use json_elem::jsonelem::JsonElem;
 use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -106,12 +107,19 @@ impl SocketMessage {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct CallMethod {
+    pub object: String,
+    pub method: String,
+    pub param: JsonElem,
+}
+
 #[cfg(test)]
 mod tests {
     use json_elem::jsonelem::JsonElem;
     use test_case::test_case;
 
-    use crate::objects::CallMethod;
+    use crate::message::CallMethod;
 
     use super::{MessageType, SocketMessage};
 

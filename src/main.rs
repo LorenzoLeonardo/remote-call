@@ -1,17 +1,16 @@
-mod message;
 mod objects;
-mod socket;
 
 use std::{collections::HashMap, sync::Arc};
 
 use atticus::run_actor;
 use tokio::{net::TcpListener, sync::Mutex};
 
-use crate::{
+use remote_call::{
     message::{MessageType, SocketMessage},
-    objects::{ListObjects, RequestListObjects},
     socket::Socket,
 };
+
+use crate::objects::{ListObjects, RequestListObjects};
 
 pub const ENV_LOGGER: &str = "RUST_LOG";
 

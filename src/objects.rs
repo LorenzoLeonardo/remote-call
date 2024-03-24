@@ -2,11 +2,9 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use atticus::Actor;
-use json_elem::jsonelem::JsonElem;
-use serde::{Deserialize, Serialize};
 
-use crate::{
-    message::{MessageType, SocketMessage},
+use remote_call::{
+    message::{CallMethod, MessageType, SocketMessage},
     socket::Socket,
 };
 
@@ -19,13 +17,6 @@ pub enum RequestListObjects {
     Add(SocketMessage, Socket),
     Remove(Socket),
     CallMethod(SocketMessage),
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct CallMethod {
-    pub object: String,
-    pub method: String,
-    pub param: JsonElem,
 }
 
 impl ListObjects {
@@ -105,8 +96,8 @@ impl Actor for ListObjects {
 
 #[cfg(test)]
 mod tests {
-    use super::CallMethod;
     use json_elem::jsonelem::JsonElem;
+    use remote_call::message::CallMethod;
 
     #[test]
     fn test_call_method() {
