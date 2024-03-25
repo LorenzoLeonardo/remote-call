@@ -100,8 +100,23 @@ impl SocketMessage {
     pub fn kind(&self) -> MessageType {
         self.kind
     }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap()
+    }
 }
 
+pub fn result_to_socket_message(
+    res: Result<Option<SocketMessage>, atticus::Error>,
+    msg_type: MessageType,
+) -> SocketMessage {
+    match res {
+        Ok(respon) => respon.unwrap(),
+        Err(err) => SocketMessage::new()
+            .set_kind(msg_type)
+            .set_body(err.to_string().as_bytes()),
+    }
+}
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CallMethod {
     pub object: String,

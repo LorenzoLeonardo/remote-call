@@ -55,16 +55,19 @@ impl ListObjects {
             Ok(call_method) => {
                 if let Some(remote) = self.objects.get(&call_method.object) {
                     match serde_json::to_vec(&msg) {
-                        Ok(data) => match remote.write(&data).await {
-                            Ok(_res) => msg
-                                .set_body("success".as_bytes())
-                                .set_kind(MessageType::RemoteCallResponse),
-                            Err(err) => {
-                                log::error!("ListObjects::call_method: {:?}", err);
-                                msg.set_body("remote connection error".as_bytes())
-                                    .set_kind(MessageType::RemoteCallResponse)
+                        Ok(data) => {
+                            log::info!("NISULOD");
+                            match remote.write(&data).await {
+                                Ok(_res) => msg
+                                    .set_body("success".as_bytes())
+                                    .set_kind(MessageType::RemoteCallResponse),
+                                Err(err) => {
+                                    log::error!("ListObjects::call_method: {:?}", err);
+                                    msg.set_body("remote connection error".as_bytes())
+                                        .set_kind(MessageType::RemoteCallResponse)
+                                }
                             }
-                        },
+                        }
                         Err(_) => todo!(),
                     }
                 } else {
