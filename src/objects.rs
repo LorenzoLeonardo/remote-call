@@ -62,6 +62,7 @@ impl ListObjects {
                                 .set_kind(MessageType::RemoteCallResponse),
                             Err(err) => {
                                 log::error!("ListObjects::call_method: {:?}", err);
+                                let _ = self.remove(remote.clone());
                                 msg.set_body("remote connection error".as_bytes())
                                     .set_kind(MessageType::RemoteCallResponse)
                             }

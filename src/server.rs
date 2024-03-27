@@ -58,7 +58,9 @@ pub async fn start_server() {
                                 res,
                                 MessageType::AddShareObjectResponse,
                             );
-                            let _ = socket.write(msg.as_bytes().as_slice()).await;
+                            if socket.write(msg.as_bytes().as_slice()).await.is_err() {
+                                break;
+                            }
                         }
                         MessageType::AddShareObjectResponse => {
                             log::info!("[{}] {}", socket.ip_address(), msg);
@@ -121,7 +123,9 @@ pub async fn start_server() {
                                     .await;
                             let msg =
                                 message::result_to_socket_message(res, MessageType::WaitForObject);
-                            let _ = socket.write(msg.as_bytes().as_slice()).await;
+                            if socket.write(msg.as_bytes().as_slice()).await.is_err() {
+                                break;
+                            }
                         }
                     },
                     Err(error) => {
