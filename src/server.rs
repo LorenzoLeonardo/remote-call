@@ -45,11 +45,7 @@ pub async fn start_server() {
                 match serde_json::from_slice::<SocketMessage>(data.as_slice()) {
                     Ok(mut msg) => match msg.kind() {
                         MessageType::AddShareObjectRequest => {
-                            log::info!(
-                                "[{}] AddShareObjectRequest: {:?}",
-                                socket.ip_address(),
-                                msg
-                            );
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                             let res: Result<Option<SocketMessage>, atticus::Error> =
                                 list_object_requestor
                                     .request(RequestListObjects::Add(msg, socket.clone()))
@@ -61,10 +57,10 @@ pub async fn start_server() {
                             let _ = socket.write(msg.as_bytes().as_slice()).await;
                         }
                         MessageType::AddShareObjectResponse => {
-                            log::info!("AddShareObjectResponse: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::RemoteCallRequest => {
-                            log::info!("[{}] RemoteCallRequest: {:?}", socket.ip_address(), msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                             let mut lst = inner_list_call_object.lock().await;
                             let id = lst.len() as u32;
                             msg = msg.set_id(id);
@@ -75,7 +71,7 @@ pub async fn start_server() {
                                 .await;
                         }
                         MessageType::RemoteCallResponse => {
-                            log::info!("[{}] RemoteCallResponse: {:?}", socket.ip_address(), msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                             let mut lst = inner_list_call_object.lock().await;
                             if let Some(remote) = lst.get(&msg.id()) {
                                 match serde_json::to_vec(&msg) {
@@ -92,25 +88,25 @@ pub async fn start_server() {
                             }
                         }
                         MessageType::SendEventRequest => {
-                            log::info!("SendEventRequest: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::SendEventResponse => {
-                            log::info!("SendEventResponse: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::RegisterEventRequest => {
-                            log::info!("RegisterEventRequest: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::RegisterEventResponse => {
-                            log::info!("RegisterEventResponse: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::RemoveShareObjectRequest => {
-                            log::info!("RemoveShareObjectRequest: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::RemoveShareObjectResponse => {
-                            log::info!("RemoveShareObjectResponse: {:?}", msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::WaitForObject => {
-                            log::info!("[{}] WaitForObject: {:?}", socket.ip_address(), msg);
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                             let res: Result<Option<SocketMessage>, atticus::Error> =
                                 list_object_requestor
                                     .request(RequestListObjects::WaitForObject(msg))
