@@ -16,7 +16,7 @@ pub async fn start_server() {
 
     log::trace!("Server listening on {}", server_address);
     let list_call_object = Arc::new(Mutex::new(HashMap::<u64, Socket>::new()));
-    let call_object_count = Arc::new(Mutex::new(0 as u64));
+    let id_count = Arc::new(Mutex::new(0_u64));
     let res = run_actor(ListObjects::new(), 1);
 
     loop {
@@ -24,7 +24,7 @@ pub async fn start_server() {
         let socket = Socket::new(socket, addr);
         let list_object_requestor = res.requestor.clone();
         let inner_list_call_object = list_call_object.clone();
-        let inner_call_object_count = call_object_count.clone();
+        let inner_id_count = id_count.clone();
         tokio::spawn(async move {
             log::trace!("Connected: {}", socket.ip_address());
 
@@ -46,6 +46,9 @@ pub async fn start_server() {
                 match serde_json::from_slice::<SocketMessage>(data.as_slice()) {
                     Ok(mut msg) => match msg.kind() {
                         MessageType::AddShareObjectRequest => {
+                            let mut id = inner_id_count.lock().await;
+                            *id += 1;
+                            msg = msg.set_id(*id);
                             log::info!("[{}] {}", socket.ip_address(), msg);
                             let res: Result<Option<SocketMessage>, atticus::Error> =
                                 list_object_requestor
@@ -62,11 +65,10 @@ pub async fn start_server() {
                         }
                         MessageType::RemoteCallRequest => {
                             let mut lst = inner_list_call_object.lock().await;
-                            let mut count = inner_call_object_count.lock().await;
-                            *count = *count + 1;
-                            let id = *count;
-                            msg = msg.set_id(id);
-                            lst.insert(id, socket.clone());
+                            let mut id = inner_id_count.lock().await;
+                            *id += 1;
+                            msg = msg.set_id(*id);
+                            lst.insert(*id, socket.clone());
 
                             log::info!("[{}] {}", socket.ip_address(), msg);
                             let _ = list_object_requestor
@@ -109,6 +111,9 @@ pub async fn start_server() {
                             log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::WaitForObject => {
+                            let mut id = inner_id_count.lock().await;
+                            *id += 1;
+                            msg = msg.set_id(*id);
                             log::info!("[{}] {}", socket.ip_address(), msg);
                             let res: Result<Option<SocketMessage>, atticus::Error> =
                                 list_object_requestor
@@ -199,7 +204,9 @@ mod tests {
         async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
             log::trace!("[Orange] Method: {} Param: {:?}", method, param);
 
-            Ok(JsonElem::String("This is my response from orange".into()))
+            Err(Error::new(JsonElem::String(
+                "exception happend".to_string(),
+            )))
         }
     }
 
@@ -247,14 +254,8 @@ mod tests {
             wait_for_objects(vec!["orange".to_string()]).await.unwrap();
             let proxy = Connector::connect().await.unwrap();
 
-            let mut param = HashMap::new();
-            param.insert(
-                "provider".to_string(),
-                JsonElem::String("microsoft".to_string()),
-            );
-
             let result = proxy
-                .remote_call("orange", "login", JsonElem::HashMap(param))
+                .remote_call("orange", "login", JsonElem::Null)
                 .await
                 .unwrap();
             log::trace!("[Process 3]: {}", result);
@@ -273,7 +274,10 @@ mod tests {
         let res3 = process3_result.lock().await;
         assert_eq!(
             *res3,
-            JsonElem::String("This is my response from orange".into())
+            JsonElem::convert_from(&Error::new(JsonElem::String(
+                "exception happend".to_string()
+            )))
+            .unwrap()
         );
     }
 }
