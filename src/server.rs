@@ -193,6 +193,7 @@ mod tests {
 
     struct Mango;
     struct Orange;
+    struct Apple;
 
     #[async_trait]
     impl SharedObject for Mango {
@@ -214,6 +215,17 @@ mod tests {
         }
     }
 
+    #[async_trait]
+    impl SharedObject for Apple {
+        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
+            log::trace!("[Apple] Method: {} Param: {:?}", method, param);
+
+            Err(Error::new(JsonElem::String(
+                "exception happend in apple".to_string(),
+            )))
+        }
+    }
+
     #[tokio::test]
     async fn test_server() {
         // The process that shares objects
@@ -226,6 +238,10 @@ mod tests {
                 .unwrap();
             shared
                 .register_object("orange", Box::new(Orange))
+                .await
+                .unwrap();
+            shared
+                .register_object("apple", Box::new(Apple))
                 .await
                 .unwrap();
             let _r = shared.spawn().await;
@@ -267,7 +283,22 @@ mod tests {
             *actual = result;
         });
 
-        let _ = tokio::join!(process1, process2, process3);
+        let process4_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
+        let process4_result4 = process4_result.clone();
+        let process4 = tokio::spawn(async move {
+            wait_for_objects(vec!["apple".to_string()]).await.unwrap();
+            let proxy = Connector::connect().await.unwrap();
+
+            let result = proxy
+                .remote_call("apple", "login", JsonElem::Null)
+                .await
+                .unwrap();
+            log::trace!("[Process 4]: {}", result);
+            let mut actual = process4_result4.lock().await;
+            *actual = result;
+        });
+
+        let _ = tokio::join!(process1, process2, process3, process4);
 
         let res2 = process2_result.lock().await;
         assert_eq!(
@@ -280,6 +311,15 @@ mod tests {
             *res3,
             JsonElem::convert_from(&Error::new(JsonElem::String(
                 "exception happend".to_string()
+            )))
+            .unwrap()
+        );
+
+        let res4 = process4_result.lock().await;
+        assert_eq!(
+            *res4,
+            JsonElem::convert_from(&Error::new(JsonElem::String(
+                "exception happend in apple".to_string()
             )))
             .unwrap()
         );
