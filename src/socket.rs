@@ -38,7 +38,10 @@ impl Socket {
             match read.read(&mut buffer).await {
                 Ok(bytes_read) => {
                     if bytes_read == 0 {
-                        return Ok(bytes_read);
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::ConnectionReset,
+                            "The connection was reset by the remote server.",
+                        ));
                     }
                     data.extend_from_slice(&buffer[0..bytes_read]);
 

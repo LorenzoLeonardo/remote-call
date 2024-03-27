@@ -24,22 +24,17 @@ pub async fn wait_for_objects(list: Vec<String>) -> Result<(), Error> {
             let stream = serde_json::to_vec(&request)
                 .map_err(|err| Error::new(JsonElem::String(err.to_string())))?;
 
-            socket.write(stream.as_slice()).await.unwrap_or_else(|e| {
-                log::error!("{:?}", e);
-            });
+            socket
+                .write(stream.as_slice())
+                .await
+                .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
 
             let mut buf = Vec::new();
-            let n = socket.read(&mut buf).await.map_or_else(
-                |e| {
-                    log::error!("{:?}", e);
-                    0
-                },
-                |size: usize| size,
-            );
+            let n = socket
+                .read(&mut buf)
+                .await
+                .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
 
-            if n == 0 {
-                return Ok(());
-            }
             let reply = serde_json::from_slice::<SocketMessage>(&buf[0..n])
                 .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
 

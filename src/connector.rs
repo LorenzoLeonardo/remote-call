@@ -61,22 +61,16 @@ impl Connector {
             .await
             .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
 
-        if n == 0 {
-            Err(Error::new(JsonElem::String(
-                CommonErrors::RemoteConnectionError.to_string(),
-            )))
+        let resp = serde_json::from_slice::<SocketMessage>(&buf[0..n])
+            .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
+        if resp.kind() == MessageType::RemoteCallResponse {
+            let json = JsonElem::try_from(resp.body())
+                .map_err(|err| Error::new(JsonElem::String(err.to_string())))?;
+            Ok(json)
         } else {
-            let resp = serde_json::from_slice::<SocketMessage>(&buf[0..n])
-                .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
-            if resp.kind() == MessageType::RemoteCallResponse {
-                let json = JsonElem::try_from(resp.body())
-                    .map_err(|err| Error::new(JsonElem::String(err.to_string())))?;
-                Ok(json)
-            } else {
-                Err(Error::new(JsonElem::String(
-                    CommonErrors::InvalidResponseData.to_string(),
-                )))
-            }
+            Err(Error::new(JsonElem::String(
+                CommonErrors::InvalidResponseData.to_string(),
+            )))
         }
     }
 }

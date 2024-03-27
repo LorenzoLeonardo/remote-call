@@ -64,15 +64,10 @@ impl SharedObjectDispatcher {
             .read(&mut buf)
             .await
             .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
-        if n == 0 {
-            Err(Error::new(JsonElem::String(
-                CommonErrors::ServerConnectionError.to_string(),
-            )))
-        } else {
-            let _ = serde_json::from_slice::<SocketMessage>(&buf[0..n])
-                .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
-            Ok(())
-        }
+
+        let _ = serde_json::from_slice::<SocketMessage>(&buf[0..n])
+            .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
+        Ok(())
     }
 
     /// This handles remote object method call from other processess.
