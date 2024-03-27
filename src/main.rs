@@ -88,7 +88,11 @@ async fn start_server() {
                 match serde_json::from_slice::<SocketMessage>(data.as_slice()) {
                     Ok(mut msg) => match msg.kind() {
                         MessageType::AddShareObjectRequest => {
-                            log::info!("AddShareObjectRequest: {:?}", msg);
+                            log::info!(
+                                "[{}] AddShareObjectRequest: {:?}",
+                                socket.ip_address(),
+                                msg
+                            );
                             let res: Result<Option<SocketMessage>, atticus::Error> =
                                 list_object_requestor
                                     .request(RequestListObjects::Add(msg, socket.clone()))
@@ -97,13 +101,13 @@ async fn start_server() {
                                 res,
                                 MessageType::AddShareObjectResponse,
                             );
-                            log::trace!("{:?}", socket.write(msg.as_bytes().as_slice()).await);
+                            let _ = socket.write(msg.as_bytes().as_slice()).await;
                         }
                         MessageType::AddShareObjectResponse => {
                             log::info!("AddShareObjectResponse: {:?}", msg);
                         }
                         MessageType::RemoteCallRequest => {
-                            log::info!("RemoteCallRequest: {:?}", msg);
+                            log::info!("[{}] RemoteCallRequest: {:?}", socket.ip_address(), msg);
                             let mut lst = inner_list_call_object.lock().await;
                             let id = lst.len() as u32;
                             msg = msg.set_id(id);
@@ -114,8 +118,7 @@ async fn start_server() {
                                 .await;
                         }
                         MessageType::RemoteCallResponse => {
-                            log::info!("RemoteCallResponse: {:?}", msg);
-
+                            log::info!("[{}] RemoteCallResponse: {:?}", socket.ip_address(), msg);
                             let mut lst = inner_list_call_object.lock().await;
                             if let Some(remote) = lst.get(&msg.id()) {
                                 match serde_json::to_vec(&msg) {
@@ -150,14 +153,14 @@ async fn start_server() {
                             log::info!("RemoveShareObjectResponse: {:?}", msg);
                         }
                         MessageType::WaitForObject => {
-                            log::info!("WaitForObject: {:?}", msg);
+                            log::info!("[{}] WaitForObject: {:?}", socket.ip_address(), msg);
                             let res: Result<Option<SocketMessage>, atticus::Error> =
                                 list_object_requestor
                                     .request(RequestListObjects::WaitForObject(msg))
                                     .await;
                             let msg =
                                 message::result_to_socket_message(res, MessageType::WaitForObject);
-                            log::trace!("{:?}", socket.write(msg.as_bytes().as_slice()).await);
+                            let _ = socket.write(msg.as_bytes().as_slice()).await;
                         }
                     },
                     Err(error) => {

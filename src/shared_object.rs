@@ -69,9 +69,8 @@ impl SharedObjectDispatcher {
                 CommonErrors::ServerConnectionError.to_string(),
             )))
         } else {
-            let reply = serde_json::from_slice::<SocketMessage>(&buf[0..n])
+            let _ = serde_json::from_slice::<SocketMessage>(&buf[0..n])
                 .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
-            log::trace!("Object Registration: {:?}", reply);
             Ok(())
         }
     }
@@ -90,10 +89,7 @@ impl SharedObjectDispatcher {
                         log::error!("{:?}", e);
                         0
                     },
-                    |size: usize| {
-                        log::trace!("Read size: {}", size);
-                        size
-                    },
+                    |size: usize| size,
                 );
 
                 if n == 0 {

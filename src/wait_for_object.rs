@@ -25,7 +25,7 @@ pub async fn wait_for_objects(list: Vec<String>) -> Result<(), Error> {
                 .map_err(|err| Error::new(JsonElem::String(err.to_string())))?;
 
             socket.write(stream.as_slice()).await.unwrap_or_else(|e| {
-                log::trace!("{:?}", e);
+                log::error!("{:?}", e);
             });
 
             let mut buf = Vec::new();
@@ -34,10 +34,7 @@ pub async fn wait_for_objects(list: Vec<String>) -> Result<(), Error> {
                     log::error!("{:?}", e);
                     0
                 },
-                |size: usize| {
-                    log::trace!("Read size: {}", size);
-                    size
-                },
+                |size: usize| size,
             );
 
             if n == 0 {
@@ -47,10 +44,8 @@ pub async fn wait_for_objects(list: Vec<String>) -> Result<(), Error> {
                 .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
 
             if reply.body() == "success".as_bytes() {
-                log::trace!("Object {} is now alive", body);
                 break;
             } else {
-                log::trace!("Object {} is not yet alive", body);
                 continue;
             }
         }
