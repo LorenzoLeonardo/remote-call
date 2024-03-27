@@ -5,6 +5,7 @@ use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::{
     message::{self, MessageType, SocketMessage},
+    objects::SUCCESS,
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
 };
 
@@ -73,9 +74,22 @@ pub async fn start_server() {
                             lst.insert(*id, socket.clone());
 
                             log::info!("[{}] {}", socket.ip_address(), msg);
-                            let _ = list_object_requestor
+                            let res = list_object_requestor
                                 .request(RequestListObjects::CallMethod(msg))
                                 .await;
+                            match res {
+                                Ok(res) => {
+                                    if let Some(res) = res {
+                                        if res.body() != SUCCESS.as_bytes() {
+                                            break;
+                                        }
+                                    }
+                                }
+                                Err(err) => {
+                                    log::error!("{:?}", err);
+                                    break;
+                                }
+                            }
                         }
                         MessageType::RemoteCallResponse => {
                             log::info!("[{}] {}", socket.ip_address(), msg);

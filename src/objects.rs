@@ -20,6 +20,8 @@ pub enum RequestListObjects {
     WaitForObject(SocketMessage),
 }
 
+pub const SUCCESS: &str = "success";
+
 impl ListObjects {
     pub fn new() -> Self {
         Self {
@@ -31,7 +33,7 @@ impl ListObjects {
         match String::from_utf8(msg.body().into()) {
             Ok(object) => {
                 self.objects.insert(object, socket);
-                msg.set_body("success".as_bytes())
+                msg.set_body(SUCCESS.as_bytes())
                     .set_kind(MessageType::AddShareObjectResponse)
             }
             Err(err) => {
@@ -86,7 +88,7 @@ impl ListObjects {
         match String::from_utf8(msg.body().into()) {
             Ok(object) => {
                 if self.objects.get(object.as_str()).is_some() {
-                    msg.set_body("success".as_bytes())
+                    msg.set_body(SUCCESS.as_bytes())
                         .set_kind(MessageType::WaitForObject)
                 } else {
                     msg.set_body("failed".as_bytes())

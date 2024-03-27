@@ -4,6 +4,7 @@ use tokio::net::TcpStream;
 use crate::{
     error::Error,
     message::{MessageType, SocketMessage},
+    objects::SUCCESS,
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
 };
 
@@ -38,7 +39,7 @@ pub async fn wait_for_objects(list: Vec<String>) -> Result<(), Error> {
             let reply = serde_json::from_slice::<SocketMessage>(&buf[0..n])
                 .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
 
-            if reply.body() == "success".as_bytes() {
+            if reply.body() == SUCCESS.as_bytes() {
                 break;
             } else {
                 continue;
