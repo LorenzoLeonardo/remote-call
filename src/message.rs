@@ -69,7 +69,7 @@ impl<'de> Deserialize<'de> for MessageType {
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 pub struct SocketMessage {
-    id: u32,
+    id: u64,
     kind: MessageType,
     msg: Vec<u8>,
 }
@@ -79,7 +79,7 @@ impl SocketMessage {
         Self::default()
     }
 
-    pub fn set_id(mut self, id: u32) -> Self {
+    pub fn set_id(mut self, id: u64) -> Self {
         self.id = id;
         self
     }
@@ -98,7 +98,7 @@ impl SocketMessage {
         &self.msg
     }
 
-    pub fn id(&self) -> u32 {
+    pub fn id(&self) -> u64 {
         self.id
     }
 
@@ -154,7 +154,7 @@ mod tests {
         r#"{"id":0,"kind":2,"msg":[123,34,111,98,106,101,99,116,34,58,34,109,121,95,111,98,106,101,99,116,34,44,34,109,101,116,104,111,100,34,58,34,109,121,95,102,117,110,99,116,105,111,110,34,44,34,112,97,114,97,109,34,58,34,116,101,115,116,32,112,97,114,97,109,34,125]}"#; "RemoteCall")]
     #[test_case(0, MessageType::SendEventRequest, "hello world".as_bytes(),
         r#"{"id":0,"kind":4,"msg":[104,101,108,108,111,32,119,111,114,108,100]}"#; "SendEvent")]
-    fn sock_message_serialize(id: u32, kind: MessageType, body: &[u8], expected: &str) {
+    fn sock_message_serialize(id: u64, kind: MessageType, body: &[u8], expected: &str) {
         let message = SocketMessage::new()
             .set_body(body)
             .set_id(id)

@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
         TcpStream,
@@ -33,9 +33,10 @@ impl Socket {
     pub async fn read(&self, data: &mut Vec<u8>) -> Result<usize, std::io::Error> {
         let mut read = self.read.lock().await;
 
+        let mut reader = BufReader::new(&mut *read);
         loop {
-            let mut buffer = [0u8; CHUNK_SIZE];
-            match read.read(&mut buffer).await {
+            let mut buffer = Vec::new();
+            match reader.read_until(b'\n', &mut buffer).await {
                 Ok(bytes_read) => {
                     if bytes_read == 0 {
                         return Err(std::io::Error::new(
@@ -45,7 +46,7 @@ impl Socket {
                     }
                     data.extend_from_slice(&buffer[0..bytes_read]);
 
-                    if bytes_read < CHUNK_SIZE {
+                    if buffer.ends_with(&[b'\n']) {
                         return Ok(data.len());
                     }
                 }
@@ -59,7 +60,9 @@ impl Socket {
     pub async fn write(&self, data: &[u8]) -> Result<(), std::io::Error> {
         let mut write = self.write.lock().await;
 
-        write.write_all(data).await
+        let mut stream = data.to_vec();
+        stream.push(b'\n');
+        write.write_all(stream.as_slice()).await
     }
 
     pub fn ip_address(&self) -> String {

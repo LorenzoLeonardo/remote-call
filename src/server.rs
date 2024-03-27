@@ -15,15 +15,16 @@ pub async fn start_server() {
     let listener = TcpListener::bind(server_address.as_str()).await.unwrap();
 
     log::trace!("Server listening on {}", server_address);
-    let list_call_object = Arc::new(Mutex::new(HashMap::<u32, Socket>::new()));
-
-    let res = run_actor(ListObjects::new(), 2);
+    let list_call_object = Arc::new(Mutex::new(HashMap::<u64, Socket>::new()));
+    let call_object_count = Arc::new(Mutex::new(0 as u64));
+    let res = run_actor(ListObjects::new(), 1);
 
     loop {
         let (socket, addr) = listener.accept().await.unwrap();
         let socket = Socket::new(socket, addr);
         let list_object_requestor = res.requestor.clone();
         let inner_list_call_object = list_call_object.clone();
+        let inner_call_object_count = call_object_count.clone();
         tokio::spawn(async move {
             log::trace!("Connected: {}", socket.ip_address());
 
@@ -60,12 +61,14 @@ pub async fn start_server() {
                             log::info!("[{}] {}", socket.ip_address(), msg);
                         }
                         MessageType::RemoteCallRequest => {
-                            log::info!("[{}] {}", socket.ip_address(), msg);
                             let mut lst = inner_list_call_object.lock().await;
-                            let id = lst.len() as u32;
+                            let mut count = inner_call_object_count.lock().await;
+                            *count = *count + 1;
+                            let id = *count;
                             msg = msg.set_id(id);
                             lst.insert(id, socket.clone());
 
+                            log::info!("[{}] {}", socket.ip_address(), msg);
                             let _ = list_object_requestor
                                 .request(RequestListObjects::CallMethod(msg))
                                 .await;
@@ -118,9 +121,10 @@ pub async fn start_server() {
                     },
                     Err(error) => {
                         log::error!(
-                            "Invalid message from {}: {}",
+                            "Invalid message from {}: {}\nStream: {:?}",
                             socket.ip_address(),
-                            error.to_string()
+                            error.to_string(),
+                            String::from_utf8(data)
                         )
                     }
                 }
@@ -179,6 +183,7 @@ mod tests {
     }
 
     struct Mango;
+    struct Orange;
 
     #[async_trait]
     impl SharedObject for Mango {
@@ -186,6 +191,15 @@ mod tests {
             log::trace!("[Mango] Method: {} Param: {:?}", method, param);
 
             Ok(JsonElem::String("This is my response from mango".into()))
+        }
+    }
+
+    #[async_trait]
+    impl SharedObject for Orange {
+        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
+            log::trace!("[Orange] Method: {} Param: {:?}", method, param);
+
+            Ok(JsonElem::String("This is my response from orange".into()))
         }
     }
 
@@ -197,6 +211,10 @@ mod tests {
 
             shared
                 .register_object("mango", Box::new(Mango))
+                .await
+                .unwrap();
+            shared
+                .register_object("orange", Box::new(Orange))
                 .await
                 .unwrap();
             let _r = shared.spawn().await;
@@ -223,12 +241,39 @@ mod tests {
             *actual = result;
         });
 
-        let _ = tokio::join!(process1, process2);
+        let process3_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
+        let process3_result3 = process3_result.clone();
+        let process3 = tokio::spawn(async move {
+            wait_for_objects(vec!["orange".to_string()]).await.unwrap();
+            let proxy = Connector::connect().await.unwrap();
+
+            let mut param = HashMap::new();
+            param.insert(
+                "provider".to_string(),
+                JsonElem::String("microsoft".to_string()),
+            );
+
+            let result = proxy
+                .remote_call("orange", "login", JsonElem::HashMap(param))
+                .await
+                .unwrap();
+            log::trace!("[Process 3]: {}", result);
+            let mut actual = process3_result3.lock().await;
+            *actual = result;
+        });
+
+        let _ = tokio::join!(process1, process2, process3);
 
         let res2 = process2_result.lock().await;
         assert_eq!(
             *res2,
             JsonElem::String("This is my response from mango".into())
+        );
+
+        let res3 = process3_result.lock().await;
+        assert_eq!(
+            *res3,
+            JsonElem::String("This is my response from orange".into())
         );
     }
 }
