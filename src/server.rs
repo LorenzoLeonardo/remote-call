@@ -88,6 +88,7 @@ pub async fn start_server() {
                                         }
                                         Err(err) => {
                                             log::error!("{:?}", err);
+                                            break;
                                         }
                                     },
                                     Err(_) => todo!(),
@@ -134,7 +135,8 @@ pub async fn start_server() {
                             socket.ip_address(),
                             error.to_string(),
                             String::from_utf8(data)
-                        )
+                        );
+                        break;
                     }
                 }
             }
