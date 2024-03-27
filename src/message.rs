@@ -14,6 +14,7 @@ pub enum MessageType {
     RegisterEventResponse,
     RemoveShareObjectRequest,
     RemoveShareObjectResponse,
+    WaitForObject,
 }
 
 impl Serialize for MessageType {
@@ -32,6 +33,7 @@ impl Serialize for MessageType {
             MessageType::RegisterEventResponse => 7,
             MessageType::RemoveShareObjectRequest => 8,
             MessageType::RemoveShareObjectResponse => 9,
+            MessageType::WaitForObject => 10,
         };
         serializer.serialize_u32(value_str)
     }
@@ -54,8 +56,9 @@ impl<'de> Deserialize<'de> for MessageType {
             7 => Ok(MessageType::RegisterEventResponse),
             8 => Ok(MessageType::RemoveShareObjectRequest),
             9 => Ok(MessageType::RemoveShareObjectResponse),
+            10 => Ok(MessageType::WaitForObject),
             _ => Err(serde::de::Error::custom(format!(
-                "Invalid value for MessageType(0,1,2,3,4,5,6,7): {}",
+                "Invalid value for MessageType(0,1,2,3,4,5,6,7,8,9,10): {}",
                 value
             ))),
         }

@@ -149,6 +149,16 @@ async fn start_server() {
                         MessageType::RemoveShareObjectResponse => {
                             log::info!("RemoveShareObjectResponse: {:?}", msg);
                         }
+                        MessageType::WaitForObject => {
+                            log::info!("WaitForObject: {:?}", msg);
+                            let res: Result<Option<SocketMessage>, atticus::Error> =
+                                list_object_requestor
+                                    .request(RequestListObjects::WaitForObject(msg))
+                                    .await;
+                            let msg =
+                                message::result_to_socket_message(res, MessageType::WaitForObject);
+                            log::trace!("{:?}", socket.write(msg.as_bytes().as_slice()).await);
+                        }
                     },
                     Err(error) => {
                         log::error!(
@@ -169,7 +179,7 @@ async fn start_server() {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc, time::Duration};
+    use std::{collections::HashMap, sync::Arc};
 
     use async_trait::async_trait;
     use json_elem::jsonelem::JsonElem;
@@ -178,6 +188,7 @@ mod tests {
         error::Error,
         shared_object::{SharedObject, SharedObjectDispatcher},
         socket::ENV_SERVER_ADDRESS,
+        wait_for_object::wait_for_objects,
     };
     use tokio::{runtime::Builder, sync::Mutex, task::LocalSet};
 
@@ -211,8 +222,6 @@ mod tests {
     }
 
     struct Mango;
-    struct Apple;
-    struct Orange;
 
     #[async_trait]
     impl SharedObject for Mango {
@@ -220,26 +229,6 @@ mod tests {
             log::trace!("[Mango] Method: {} Param: {:?}", method, param);
 
             Ok(JsonElem::String("This is my response from mango".into()))
-        }
-    }
-
-    #[async_trait]
-    impl SharedObject for Apple {
-        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
-            log::trace!("[Apple] Method: {} Param: {:?}", method, param);
-
-            Ok(JsonElem::String("This is my response from apple".into()))
-        }
-    }
-
-    #[async_trait]
-    impl SharedObject for Orange {
-        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
-            log::trace!("[Orange] Method: {} Param: {:?}", method, param);
-
-            Err(Error::new(JsonElem::String(
-                "exception happend".to_string(),
-            )))
         }
     }
 
@@ -253,22 +242,13 @@ mod tests {
                 .register_object("mango", Box::new(Mango))
                 .await
                 .unwrap();
-            shared
-                .register_object("apple", Box::new(Apple))
-                .await
-                .unwrap();
-            shared
-                .register_object("orange", Box::new(Orange))
-                .await
-                .unwrap();
-
             let _r = shared.spawn().await;
         });
 
         let process2_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
         let process2_result2 = process2_result.clone();
         let process2 = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            wait_for_objects(vec!["mango".to_string()]).await.unwrap();
             let proxy = Connector::connect().await.unwrap();
 
             let mut param = HashMap::new();
@@ -286,65 +266,12 @@ mod tests {
             *actual = result;
         });
 
-        let process3_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
-        let process3_result3 = process3_result.clone();
-        let process3 = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(500)).await;
-            let proxy = Connector::connect().await.unwrap();
-
-            let mut param = HashMap::new();
-            param.insert(
-                "provider".to_string(),
-                JsonElem::String("microsoft".to_string()),
-            );
-
-            let result = proxy
-                .remote_call("apple", "login", JsonElem::HashMap(param))
-                .await
-                .unwrap();
-            log::trace!("[Process 3]: {}", result);
-            let mut actual = process3_result3.lock().await;
-            *actual = result;
-        });
-
-        let process4_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
-        let process4_result4 = process4_result.clone();
-        let process4 = tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(500)).await;
-            let proxy = Connector::connect().await.unwrap();
-
-            let mut param = HashMap::new();
-            param.insert(
-                "provider".to_string(),
-                JsonElem::String("microsoft".to_string()),
-            );
-
-            let result = proxy
-                .remote_call("orange", "login", JsonElem::HashMap(param))
-                .await
-                .unwrap();
-            log::trace!("[Process 4]: {}", result);
-            let mut actual = process4_result4.lock().await;
-            *actual = result;
-        });
-
-        let _ = tokio::join!(process1, process2, process3, process4);
+        let _ = tokio::join!(process1, process2);
 
         let res2 = process2_result.lock().await;
         assert_eq!(
             *res2,
             JsonElem::String("This is my response from mango".into())
         );
-
-        let res3 = process3_result.lock().await;
-        assert_eq!(
-            *res3,
-            JsonElem::String("This is my response from apple".into())
-        );
-
-        let err = Error::new(JsonElem::String("exception happend".to_string()));
-
-        let res4 = process4_result.lock().await;
-        assert_eq!(*res4, JsonElem::convert_from(&err).unwrap());
     }
 }

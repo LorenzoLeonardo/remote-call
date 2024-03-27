@@ -17,6 +17,7 @@ pub enum RequestListObjects {
     Add(SocketMessage, Socket),
     Remove(Socket),
     CallMethod(SocketMessage),
+    WaitForObject(SocketMessage),
 }
 
 impl ListObjects {
@@ -55,19 +56,16 @@ impl ListObjects {
             Ok(call_method) => {
                 if let Some(remote) = self.objects.get(&call_method.object) {
                     match serde_json::to_vec(&msg) {
-                        Ok(data) => {
-                            log::info!("NISULOD");
-                            match remote.write(&data).await {
-                                Ok(_res) => msg
-                                    .set_body("success".as_bytes())
-                                    .set_kind(MessageType::RemoteCallResponse),
-                                Err(err) => {
-                                    log::error!("ListObjects::call_method: {:?}", err);
-                                    msg.set_body("remote connection error".as_bytes())
-                                        .set_kind(MessageType::RemoteCallResponse)
-                                }
+                        Ok(data) => match remote.write(&data).await {
+                            Ok(_res) => msg
+                                .set_body("success".as_bytes())
+                                .set_kind(MessageType::RemoteCallResponse),
+                            Err(err) => {
+                                log::error!("ListObjects::call_method: {:?}", err);
+                                msg.set_body("remote connection error".as_bytes())
+                                    .set_kind(MessageType::RemoteCallResponse)
                             }
-                        }
+                        },
                         Err(_) => todo!(),
                     }
                 } else {
@@ -82,6 +80,25 @@ impl ListObjects {
             }
         }
     }
+
+    pub async fn wait_for_object(&mut self, msg: SocketMessage) -> SocketMessage {
+        match String::from_utf8(msg.body().into()) {
+            Ok(object) => {
+                if self.objects.get(object.as_str()).is_some() {
+                    msg.set_body("success".as_bytes())
+                        .set_kind(MessageType::WaitForObject)
+                } else {
+                    msg.set_body("failed".as_bytes())
+                        .set_kind(MessageType::WaitForObject)
+                }
+            }
+            Err(err) => {
+                log::error!("ListObjects::wait_for_object(): {:?}", err);
+                msg.set_body("failed".as_bytes())
+                    .set_kind(MessageType::WaitForObject)
+            }
+        }
+    }
 }
 #[async_trait]
 impl Actor for ListObjects {
@@ -93,6 +110,7 @@ impl Actor for ListObjects {
             RequestListObjects::Add(msg, socket) => Some(self.add(msg, socket)),
             RequestListObjects::Remove(msg) => Some(self.remove(msg)),
             RequestListObjects::CallMethod(msg) => Some(self.call_method(msg).await),
+            RequestListObjects::WaitForObject(msg) => Some(self.wait_for_object(msg).await),
         }
     }
 }
