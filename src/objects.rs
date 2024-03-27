@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use atticus::Actor;
 
-use remote_call::{
+use crate::{
     message::{CallMethod, MessageType, SocketMessage},
     socket::Socket,
 };
@@ -115,10 +115,16 @@ impl Actor for ListObjects {
     }
 }
 
+impl Default for ListObjects {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::message::CallMethod;
     use json_elem::jsonelem::JsonElem;
-    use remote_call::message::CallMethod;
 
     #[test]
     fn test_call_method() {
