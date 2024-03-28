@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 
 use crate::{
     error::CommonErrors,
-    message::{MessageType, SocketMessage},
+    message::{Event, MessageType, SocketMessage},
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
     util, RemoteError,
 };
@@ -70,8 +70,8 @@ impl EventListener {
                 let sep = util::separate(buf.as_slice());
                 for data in sep {
                     if let Ok(msg) = serde_json::from_slice::<SocketMessage>(data.as_slice()) {
-                        let param = JsonElem::try_from(msg.body()).unwrap();
-                        match callback(param).await {
+                        let param = serde_json::from_slice::<Event>(msg.body()).unwrap();
+                        match callback(param.param).await {
                             Ok(_) => {
                                 continue;
                             }
