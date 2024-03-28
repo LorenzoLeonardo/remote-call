@@ -8,6 +8,7 @@ use crate::{
     error::{CommonErrors, Error},
     message::{CallMethod, MessageType, SocketMessage},
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
+    util,
 };
 
 #[async_trait]
@@ -87,83 +88,89 @@ impl SharedObjectDispatcher {
                 |size: usize| size,
             );
 
-            if n == 0 {
-                log::error!("Error: {}", CommonErrors::ServerConnectionError.to_string());
-                break;
-            } else if let Ok(mut msg) = serde_json::from_slice::<SocketMessage>(&buf[0..n]) {
-                if msg.kind() == MessageType::RemoteCallRequest {
-                    let val = list.lock().await;
-                    if let Ok(call) = serde_json::from_slice::<CallMethod>(msg.body()) {
-                        let response = if let Some(rem_call) = val.get(&call.object) {
-                            match rem_call.remote_call(&call.method, call.param).await {
-                                Ok(response) => {
-                                    let body: Vec<u8> = response.try_into().unwrap();
-                                    msg = msg
-                                        .set_body(&body)
-                                        .set_kind(MessageType::RemoteCallResponse);
-                                    msg
+            let sep = util::separate(buf.as_slice());
+            for data in sep {
+                if n == 0 {
+                    log::error!("Error: {}", CommonErrors::ServerConnectionError.to_string());
+                    break;
+                } else if let Ok(mut msg) = serde_json::from_slice::<SocketMessage>(data.as_slice())
+                {
+                    if msg.kind() == MessageType::RemoteCallRequest {
+                        let val = list.lock().await;
+                        if let Ok(call) = serde_json::from_slice::<CallMethod>(msg.body()) {
+                            let response = if let Some(rem_call) = val.get(&call.object) {
+                                match rem_call.remote_call(&call.method, call.param).await {
+                                    Ok(response) => {
+                                        let body: Vec<u8> = response.try_into().unwrap();
+                                        msg = msg
+                                            .set_body(&body)
+                                            .set_kind(MessageType::RemoteCallResponse);
+                                        msg
+                                    }
+                                    Err(err) => {
+                                        let response = JsonElem::convert_from(&err).unwrap();
+                                        let body: Vec<u8> = response.try_into().unwrap();
+                                        msg = msg
+                                            .set_body(&body)
+                                            .set_kind(MessageType::RemoteCallResponse);
+                                        msg
+                                    }
                                 }
-                                Err(err) => {
-                                    let response = JsonElem::convert_from(&err).unwrap();
-                                    let body: Vec<u8> = response.try_into().unwrap();
-                                    msg = msg
-                                        .set_body(&body)
-                                        .set_kind(MessageType::RemoteCallResponse);
-                                    msg
-                                }
+                            } else {
+                                let err = Error::new(JsonElem::String(
+                                    CommonErrors::ObjectNotFound.to_string(),
+                                ));
+                                let response = JsonElem::convert_from(&err).unwrap();
+                                let body: Vec<u8> = response.try_into().unwrap();
+                                msg = msg
+                                    .set_body(&body)
+                                    .set_kind(MessageType::RemoteCallResponse);
+                                msg
+                            };
+                            let stream = serde_json::to_vec(&response)
+                                .map_err(|err| Error::new(JsonElem::String(err.to_string())))
+                                .unwrap();
+
+                            if socket.write(stream.as_slice()).await.is_err() {
+                                break;
                             }
                         } else {
                             let err = Error::new(JsonElem::String(
-                                CommonErrors::ObjectNotFound.to_string(),
+                                CommonErrors::SerdeParseError.to_string(),
                             ));
                             let response = JsonElem::convert_from(&err).unwrap();
                             let body: Vec<u8> = response.try_into().unwrap();
                             msg = msg
                                 .set_body(&body)
                                 .set_kind(MessageType::RemoteCallResponse);
-                            msg
-                        };
-                        let stream = serde_json::to_vec(&response)
-                            .map_err(|err| Error::new(JsonElem::String(err.to_string())))
-                            .unwrap();
 
-                        if socket.write(stream.as_slice()).await.is_err() {
-                            break;
-                        }
-                    } else {
-                        let err =
-                            Error::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
-                        let response = JsonElem::convert_from(&err).unwrap();
-                        let body: Vec<u8> = response.try_into().unwrap();
-                        msg = msg
-                            .set_body(&body)
-                            .set_kind(MessageType::RemoteCallResponse);
-
-                        let stream = serde_json::to_vec(&msg)
-                            .map_err(|err| Error::new(JsonElem::String(err.to_string())))
-                            .unwrap();
-                        if socket.write(stream.as_slice()).await.is_err() {
-                            break;
+                            let stream = serde_json::to_vec(&msg)
+                                .map_err(|err| Error::new(JsonElem::String(err.to_string())))
+                                .unwrap();
+                            if socket.write(stream.as_slice()).await.is_err() {
+                                break;
+                            }
                         }
                     }
-                }
-            } else {
-                log::error!("Invalid stream");
-                let mut msg = SocketMessage::new();
-                let err = Error::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
-                let response = JsonElem::convert_from(&err).unwrap();
-                let body: Vec<u8> = response.try_into().unwrap();
-                msg = msg
-                    .set_body(&body)
-                    .set_kind(MessageType::RemoteCallResponse);
+                } else {
+                    log::error!("Invalid stream");
+                    let mut msg = SocketMessage::new();
+                    let err =
+                        Error::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
+                    let response = JsonElem::convert_from(&err).unwrap();
+                    let body: Vec<u8> = response.try_into().unwrap();
+                    msg = msg
+                        .set_body(&body)
+                        .set_kind(MessageType::RemoteCallResponse);
 
-                let stream = serde_json::to_vec(&msg)
-                    .map_err(|err| Error::new(JsonElem::String(err.to_string())))
-                    .unwrap();
-                if socket.write(stream.as_slice()).await.is_err() {
+                    let stream = serde_json::to_vec(&msg)
+                        .map_err(|err| Error::new(JsonElem::String(err.to_string())))
+                        .unwrap();
+                    if socket.write(stream.as_slice()).await.is_err() {
+                        break;
+                    }
                     break;
                 }
-                break;
             }
         }
     }

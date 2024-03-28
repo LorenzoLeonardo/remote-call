@@ -6,4 +6,5 @@ pub mod objects;
 pub mod server;
 pub mod shared_object;
 pub mod socket;
+pub mod util;
 pub mod wait_for_object;

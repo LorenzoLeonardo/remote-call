@@ -7,36 +7,10 @@ use crate::{
     message::{self, MessageType, SocketMessage},
     objects::SUCCESS,
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
+    util,
 };
 
 use crate::objects::{ListObjects, RequestListObjects};
-
-fn separate(data: &[u8]) -> Vec<Vec<u8>> {
-    let json_str = String::from_utf8(data.to_vec()).unwrap();
-
-    if !json_str.contains("}{") {
-        return vec![data.to_vec()];
-    }
-    let parts: Vec<String> = json_str
-        .trim()
-        .split("}{")
-        .map(|part| part.to_string() + "}")
-        .collect();
-
-    let num_parts = parts.len();
-    let mut ret = Vec::new();
-
-    for (n, mut part) in parts.into_iter().enumerate() {
-        if n >= 1 {
-            part = "{".to_string() + &part;
-        }
-        if n == (num_parts - 1) {
-            part.pop();
-        }
-        ret.push(part.as_bytes().to_vec());
-    }
-    ret
-}
 
 pub async fn start_server() {
     let server_address = std::env::var(ENV_SERVER_ADDRESS).unwrap_or(SERVER_ADDRESS.to_owned());
@@ -70,7 +44,7 @@ pub async fn start_server() {
                         break;
                     }
                 }
-                let sep = separate(data.as_slice());
+                let sep = util::separate(data.as_slice());
                 for data in sep {
                     match serde_json::from_slice::<SocketMessage>(data.as_slice()) {
                         Ok(mut msg) => match msg.kind() {
@@ -201,7 +175,6 @@ mod tests {
         connector::Connector,
         error::Error,
         logger::setup_logger,
-        message::SocketMessage,
         shared_object::{SharedObject, SharedObjectDispatcher},
         socket::ENV_SERVER_ADDRESS,
         wait_for_object::wait_for_objects,
@@ -210,7 +183,7 @@ mod tests {
     use json_elem::jsonelem::JsonElem;
     use tokio::{runtime::Builder, sync::Mutex, task::LocalSet};
 
-    use super::{separate, start_server};
+    use super::start_server;
 
     fn find_available_port(start_port: u16) -> Option<u16> {
         (start_port..=u16::MAX)
@@ -335,32 +308,5 @@ mod tests {
             *res4,
             JsonElem::String("This is my response from mango".into())
         );
-    }
-
-    #[test]
-    fn test_separate() {
-        let json_str = r#"{"id":5,"kind":3,"msg":[34,84,104,105,115,32,105,115,32,109,121,32,114,101,115,112,111,110,115,101,32,102,114,111,109,32,109,97,110,103,111,34]}{"id":6,"kind":3,"msg":[34,84,104,105,115,32,105,115,32,109,121,32,114,101,115,112,111,110,115,101,32,102,114,111,109,32,109,97,110,103,111,34]}{"id":8,"kind":3,"msg":[34,84,104,105,115,32,105,115,32,109,121,32,114,101,115,112,111,110,115,101,32,102,114,111,109,32,109,97,110,103,111,34]}"#.as_bytes();
-        let ret = separate(json_str);
-
-        assert_eq!(ret.len(), 3);
-        for data in ret {
-            let _msg = serde_json::from_slice::<SocketMessage>(data.as_slice()).unwrap();
-        }
-
-        let json_str = r#"{"id":5,"kind":3,"msg":[34,84,104,105,115,32,105,115,32,109,121,32,114,101,115,112,111,110,115,101,32,102,114,111,109,32,109,97,110,103,111,34]}"#.as_bytes();
-        let ret = separate(json_str);
-
-        assert_eq!(ret.len(), 1);
-        for data in ret {
-            let _msg = serde_json::from_slice::<SocketMessage>(data.as_slice()).unwrap();
-        }
-
-        let json_str = r#"{"id":5,"kind":3,"msg":[34,84,104,105,115,32,105,115,32,109,121,32,114,101,115,112,111,110,115,101,32,102,114,111,109,32,109,97,110,103,111,34]}{"id":8,"kind":3,"msg":[34,84,104,105,115,32,105,115,32,109,121,32,114,101,115,112,111,110,115,101,32,102,114,111,109,32,109,97,110,103,111,34]}"#.as_bytes();
-        let ret = separate(json_str);
-
-        assert_eq!(ret.len(), 2);
-        for data in ret {
-            let _msg = serde_json::from_slice::<SocketMessage>(data.as_slice()).unwrap();
-        }
     }
 }
