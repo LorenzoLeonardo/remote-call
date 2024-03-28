@@ -186,7 +186,7 @@ pub async fn start_server() {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, sync::Arc};
+    use std::{collections::HashMap, sync::Arc, time::Duration};
 
     use crate::{
         connector::Connector,
@@ -195,6 +195,7 @@ mod tests {
         shared_object::{SharedObject, SharedObjectDispatcher},
         socket::ENV_SERVER_ADDRESS,
         wait_for_object::wait_for_objects,
+        EventListener,
     };
     use async_trait::async_trait;
     use json_elem::JsonElem;
@@ -396,5 +397,32 @@ mod tests {
             *res6,
             JsonElem::String("This is my response from Orange".into())
         );
+    }
+
+    #[tokio::test]
+    async fn test_event() {
+        let event_subscriber = tokio::spawn(async move {
+            let event_listener = EventListener::dispatch().await.unwrap();
+            let _ = event_listener
+                .listen("event", |param| async move {
+                    log::info!("Event: {:?}", param);
+                    Ok::<(), RemoteError>(())
+                })
+                .await
+                .unwrap();
+        });
+
+        let event_sender = tokio::spawn(async move {
+            let sender = Connector::connect().await.unwrap();
+            sender
+                .send_event(
+                    "event",
+                    JsonElem::String("Sending you this event!!".to_string()),
+                )
+                .await
+                .unwrap();
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        });
+        let _ = tokio::join!(event_subscriber, event_sender);
     }
 }
