@@ -1,9 +1,20 @@
+# This crate is a cross-platform inter-process communication system
+# that manages messages across processes using TCP stream.
+# It uses JSON formatted stream as a protocol when exchanging
+# messages across processes.
+#
+# This is also a library for the client-side processes for Rust.
+# The user application can share the object across the TCP stream.
 [package]
 name = "remote-call"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Lorenzo Leonardo <enzotechcomputersolutions@gmail.com>"]
+license = "MIT"
+description = "This crate is a cross-platform inter-process communication system that manages messages across processes using TCP stream."
+repository = "https://github.com/LorenzoLeonardo/remote-call"
+homepage = "https://github.com/LorenzoLeonardo/remote-call"
+readme = "README.md"
 
 [dependencies]
 async-trait = "0.1"
