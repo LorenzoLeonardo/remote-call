@@ -213,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "json-elem"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30ea1eff72d72db0a2fbf24397a8933bd8966133e4ad4d50528d71b45867d70f"
+checksum = "3d9d86e21d762b32addf092472baa8bebb9e66b352f5dfcb93f0e237a90617cb"
 dependencies = [
  "serde",
  "serde_derive",

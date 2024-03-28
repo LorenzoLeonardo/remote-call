@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use json_elem::jsonelem::JsonElem;
+use json_elem::JsonElem;
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, Display, EnumString};
 

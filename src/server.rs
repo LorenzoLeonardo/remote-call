@@ -180,7 +180,7 @@ mod tests {
         wait_for_object::wait_for_objects,
     };
     use async_trait::async_trait;
-    use json_elem::jsonelem::JsonElem;
+    use json_elem::JsonElem;
     use tokio::{runtime::Builder, sync::Mutex, task::LocalSet};
 
     use super::start_server;

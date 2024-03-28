@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use json_elem::jsonelem::JsonElem;
+use json_elem::JsonElem;
 use serde::{Deserialize, Serialize, Serializer};
 
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
@@ -136,7 +136,7 @@ pub struct CallMethod {
 
 #[cfg(test)]
 mod tests {
-    use json_elem::jsonelem::JsonElem;
+    use json_elem::JsonElem;
     use test_case::test_case;
 
     use crate::message::CallMethod;

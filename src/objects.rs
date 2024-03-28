@@ -127,7 +127,7 @@ impl Default for ListObjects {
 #[cfg(test)]
 mod tests {
     use crate::message::CallMethod;
-    use json_elem::jsonelem::JsonElem;
+    use json_elem::JsonElem;
 
     #[test]
     fn test_call_method() {
