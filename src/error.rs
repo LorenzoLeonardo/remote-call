@@ -43,3 +43,42 @@ pub enum CommonErrors {
     #[strum(serialize = "invalid response data")]
     InvalidResponseData,
 }
+
+#[derive(Debug)]
+pub enum Error {
+    IO(std::io::Error),
+    Atticus(atticus::Error),
+    Others(String),
+    Serde(serde_json::Error),
+}
+
+impl std::error::Error for Error {}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::IO(err) => write!(f, "{}", err),
+            Error::Atticus(err) => write!(f, "{}", err),
+            Error::Others(err) => write!(f, "{}", err),
+            Error::Serde(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl From<atticus::Error> for Error {
+    fn from(value: atticus::Error) -> Self {
+        Self::Atticus(value)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Self::IO(value)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Serde(value)
+    }
+}
