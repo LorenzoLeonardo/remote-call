@@ -1,10 +1,16 @@
 pub mod connector;
 pub mod error;
 pub mod logger;
-pub mod message;
-pub mod objects;
+mod message;
+mod objects;
 pub mod server;
 pub mod shared_object;
-pub mod socket;
-pub mod util;
+mod socket;
+mod util;
 pub mod wait_for_object;
+
+pub use connector::Connector;
+pub use error::Error;
+pub use server::start_server;
+pub use shared_object::{SharedObject, SharedObjectDispatcher};
+pub use wait_for_object::wait_for_objects;
