@@ -11,7 +11,7 @@ mod util;
 pub mod wait_for_object;
 
 pub use connector::Connector;
-pub use error::RemoteError;
+pub use error::{Error, RemoteError};
 pub use event::EventListener;
 pub use server::start_server;
 pub use shared_object::{SharedObject, SharedObjectDispatcher};
