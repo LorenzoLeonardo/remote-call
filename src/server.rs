@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_server() {
+    async fn test_server_shared_object_call_method() {
         // The process that shares objects
         let process1 = tokio::spawn(async move {
             let mut shared = SharedObjectDispatcher::new().await.unwrap();
