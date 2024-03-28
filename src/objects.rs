@@ -23,6 +23,7 @@ pub enum RequestListObjects {
 }
 
 pub const SUCCESS: &str = "success";
+pub const FAILED: &str = "failed";
 
 impl ListObjects {
     pub fn new() -> Self {
@@ -41,7 +42,7 @@ impl ListObjects {
             }
             Err(err) => {
                 log::error!("ListObjects::add(): {:?}", err);
-                msg.set_body("failed".as_bytes())
+                msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::AddShareObjectResponse)
             }
         }
@@ -62,7 +63,7 @@ impl ListObjects {
                 if let Some(remote) = self.objects.get(&call_method.object) {
                     match remote.write(&msg.as_bytes()).await {
                         Ok(_) => msg
-                            .set_body("success".as_bytes())
+                            .set_body(SUCCESS.as_bytes())
                             .set_kind(MessageType::RemoteCallResponse),
                         Err(err) => {
                             log::error!("ListObjects::call_method: {:?}", err);
@@ -72,13 +73,13 @@ impl ListObjects {
                         }
                     }
                 } else {
-                    msg.set_body("object not found".as_bytes())
+                    msg.set_body(FAILED.as_bytes())
                         .set_kind(MessageType::RemoteCallResponse)
                 }
             }
             Err(err) => {
                 log::error!("ListObjects::call_method(): {:?}", err);
-                msg.set_body("failed".as_bytes())
+                msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::AddShareObjectResponse)
             }
         }
@@ -91,13 +92,13 @@ impl ListObjects {
                     msg.set_body(SUCCESS.as_bytes())
                         .set_kind(MessageType::WaitForObject)
                 } else {
-                    msg.set_body("failed".as_bytes())
+                    msg.set_body(FAILED.as_bytes())
                         .set_kind(MessageType::WaitForObject)
                 }
             }
             Err(err) => {
                 log::error!("ListObjects::wait_for_object(): {:?}", err);
-                msg.set_body("failed".as_bytes())
+                msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::WaitForObject)
             }
         }
@@ -112,7 +113,7 @@ impl ListObjects {
             }
             Err(err) => {
                 log::error!("ListObjects::subscribe_event(): {:?}", err);
-                msg.set_body("failed".as_bytes())
+                msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::SubscribeEventResponse)
             }
         }
@@ -123,8 +124,8 @@ impl ListObjects {
             Ok(event) => {
                 for (event_name, socket) in &self.events {
                     if *event_name == event.event {
-                        let stream = serde_json::to_vec(&msg).unwrap();
-                        let _ = socket.write(stream.as_slice()).await;
+                        let ret = socket.write(&msg.as_bytes()).await;
+                        log::trace!("ListObjects::send_event: {:?}", ret);
                     }
                 }
                 msg.set_body(SUCCESS.as_bytes())
@@ -132,7 +133,7 @@ impl ListObjects {
             }
             Err(err) => {
                 log::error!("ListObjects::send_event(): {:?}", err);
-                msg.set_body("failed".as_bytes())
+                msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::SendEventResponse)
             }
         }

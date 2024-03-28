@@ -15,6 +15,10 @@ impl RemoteError {
     pub fn new(error: JsonElem) -> Self {
         Self { error }
     }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap()
+    }
 }
 
 impl Display for RemoteError {

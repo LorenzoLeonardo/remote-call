@@ -135,10 +135,22 @@ pub struct CallMethod {
     pub param: JsonElem,
 }
 
+impl CallMethod {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Event {
     pub event: String,
     pub param: JsonElem,
+}
+
+impl Event {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap()
+    }
 }
 
 #[cfg(test)]

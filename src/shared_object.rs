@@ -49,14 +49,12 @@ impl SharedObjectDispatcher {
 
         list.insert(object.to_string(), shared_object);
 
-        let object = SocketMessage::new()
+        let msg = SocketMessage::new()
             .set_kind(MessageType::AddShareObjectRequest)
             .set_body(object.as_bytes());
-        let stream = serde_json::to_vec(&object)
-            .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
 
         self.socket
-            .write(stream.as_slice())
+            .write(&msg.as_bytes())
             .await
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
@@ -97,10 +95,8 @@ impl SharedObjectDispatcher {
                         let err = RemoteError::new(JsonElem::String(
                             CommonErrors::SerdeParseError.to_string(),
                         ));
-                        let response = JsonElem::convert_from(&err)?;
-                        let body: Vec<u8> = response.try_into()?;
                         msg = msg
-                            .set_body(&body)
+                            .set_body(&err.as_bytes())
                             .set_kind(MessageType::RemoteCallResponse);
 
                         socket.write(&msg.as_bytes()).await?;
@@ -138,20 +134,16 @@ impl SharedObjectDispatcher {
             } else {
                 let err =
                     RemoteError::new(JsonElem::String(CommonErrors::ObjectNotFound.to_string()));
-                let response = JsonElem::convert_from(&err)?;
-                let body: Vec<u8> = response.try_into()?;
                 msg = msg
-                    .set_body(&body)
+                    .set_body(&err.as_bytes())
                     .set_kind(MessageType::RemoteCallResponse);
                 msg
             };
             socket.write(&msg.as_bytes()).await?;
         } else {
             let err = RemoteError::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
-            let response = JsonElem::convert_from(&err)?;
-            let body: Vec<u8> = response.try_into()?;
             msg = msg
-                .set_body(&body)
+                .set_body(&err.as_bytes())
                 .set_kind(MessageType::RemoteCallResponse);
 
             socket.write(&msg.as_bytes()).await?;
