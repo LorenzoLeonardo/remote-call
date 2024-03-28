@@ -15,3 +15,8 @@ Supported OS:
 - Windows
 - Linux
 - Mac OS
+
+
+## Inter-processes Diagram Overview
+
+![2024-03-28 19_47_19-Greenshot](https://github.com/LorenzoLeonardo/remote-call/assets/97872577/df84b504-1174-47bf-877a-04b6d20ec2e5)
