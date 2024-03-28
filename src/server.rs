@@ -144,9 +144,6 @@ async fn process_message(
                 .await;
             log::trace!("{:?}", ret);
         }
-        MessageType::SendEventResponse => {
-            log::info!("[{}] {}", socket.ip_address(), msg);
-        }
         MessageType::SubscribeEventRequest => {
             let mut id = inner_id_count.lock().await;
             *id += 1;
