@@ -208,8 +208,6 @@ mod tests {
     }
 
     struct Mango;
-    struct Orange;
-    struct Apple;
 
     #[async_trait]
     impl SharedObject for Mango {
@@ -217,28 +215,6 @@ mod tests {
             log::trace!("[Mango] Method: {} Param: {:?}", method, param);
 
             Ok(JsonElem::String("This is my response from mango".into()))
-        }
-    }
-
-    #[async_trait]
-    impl SharedObject for Orange {
-        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
-            log::trace!("[Orange] Method: {} Param: {:?}", method, param);
-
-            Err(Error::new(JsonElem::String(
-                "exception happend".to_string(),
-            )))
-        }
-    }
-
-    #[async_trait]
-    impl SharedObject for Apple {
-        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
-            log::trace!("[Apple] Method: {} Param: {:?}", method, param);
-
-            Err(Error::new(JsonElem::String(
-                "exception happend in apple".to_string(),
-            )))
         }
     }
 
@@ -252,14 +228,7 @@ mod tests {
                 .register_object("mango", Box::new(Mango))
                 .await
                 .unwrap();
-            shared
-                .register_object("orange", Box::new(Orange))
-                .await
-                .unwrap();
-            shared
-                .register_object("apple", Box::new(Apple))
-                .await
-                .unwrap();
+
             let _r = shared.spawn().await;
         });
 
@@ -287,11 +256,11 @@ mod tests {
         let process3_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
         let process3_result3 = process3_result.clone();
         let process3 = tokio::spawn(async move {
-            wait_for_objects(vec!["orange".to_string()]).await.unwrap();
+            wait_for_objects(vec!["mango".to_string()]).await.unwrap();
             let proxy = Connector::connect().await.unwrap();
 
             let result = proxy
-                .remote_call("orange", "login", JsonElem::Null)
+                .remote_call("mango", "login", JsonElem::Null)
                 .await
                 .unwrap();
             log::trace!("[Process 3]: {}", result);
@@ -302,11 +271,11 @@ mod tests {
         let process4_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
         let process4_result4 = process4_result.clone();
         let process4 = tokio::spawn(async move {
-            wait_for_objects(vec!["apple".to_string()]).await.unwrap();
+            wait_for_objects(vec!["mango".to_string()]).await.unwrap();
             let proxy = Connector::connect().await.unwrap();
 
             let result = proxy
-                .remote_call("apple", "login", JsonElem::Null)
+                .remote_call("mango", "login", JsonElem::Null)
                 .await
                 .unwrap();
             log::trace!("[Process 4]: {}", result);
@@ -325,19 +294,13 @@ mod tests {
         let res3 = process3_result.lock().await;
         assert_eq!(
             *res3,
-            JsonElem::convert_from(&Error::new(JsonElem::String(
-                "exception happend".to_string()
-            )))
-            .unwrap()
+            JsonElem::String("This is my response from mango".into())
         );
 
         let res4 = process4_result.lock().await;
         assert_eq!(
             *res4,
-            JsonElem::convert_from(&Error::new(JsonElem::String(
-                "exception happend in apple".to_string()
-            )))
-            .unwrap()
+            JsonElem::String("This is my response from mango".into())
         );
     }
 }
