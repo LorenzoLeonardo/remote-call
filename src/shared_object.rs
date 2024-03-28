@@ -127,10 +127,9 @@ impl SharedObjectDispatcher {
                                 .map_err(|err| Error::new(JsonElem::String(err.to_string())))
                                 .unwrap();
 
-                            socket
-                                .write(stream.as_slice())
-                                .await
-                                .unwrap_or_else(|e| log::error!("{:?}", e));
+                            if socket.write(stream.as_slice()).await.is_err() {
+                                break;
+                            }
                         } else {
                             let err = Error::new(JsonElem::String(
                                 CommonErrors::SerdeParseError.to_string(),
@@ -144,10 +143,9 @@ impl SharedObjectDispatcher {
                             let stream = serde_json::to_vec(&msg)
                                 .map_err(|err| Error::new(JsonElem::String(err.to_string())))
                                 .unwrap();
-                            socket
-                                .write(stream.as_slice())
-                                .await
-                                .unwrap_or_else(|e| log::error!("{:?}", e));
+                            if socket.write(stream.as_slice()).await.is_err() {
+                                break;
+                            }
                         }
                     }
                 } else {
@@ -163,10 +161,9 @@ impl SharedObjectDispatcher {
                     let stream = serde_json::to_vec(&msg)
                         .map_err(|err| Error::new(JsonElem::String(err.to_string())))
                         .unwrap();
-                    socket
-                        .write(stream.as_slice())
-                        .await
-                        .unwrap_or_else(|e| log::error!("{:?}", e));
+                    if socket.write(stream.as_slice()).await.is_err() {
+                        break;
+                    }
                 }
             }
         })
