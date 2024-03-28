@@ -223,6 +223,17 @@ mod tests {
         }
     }
 
+    struct Orange;
+
+    #[async_trait]
+    impl SharedObject for Orange {
+        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
+            log::trace!("[Orange] Method: {} Param: {:?}", method, param);
+
+            Ok(JsonElem::String("This is my response from Orange".into()))
+        }
+    }
+
     #[tokio::test]
     async fn test_server() {
         // The process that shares objects
@@ -231,6 +242,10 @@ mod tests {
 
             shared
                 .register_object("mango", Box::new(Mango))
+                .await
+                .unwrap();
+            shared
+                .register_object("orange", Box::new(Orange))
                 .await
                 .unwrap();
 
@@ -288,7 +303,43 @@ mod tests {
             *actual = result;
         });
 
-        let _ = tokio::join!(process2, process3, process4);
+        let process5_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
+        let process5_result5 = process5_result.clone();
+        let process5 = tokio::spawn(async move {
+            wait_for_objects(vec!["orange".to_string()]).await.unwrap();
+            let proxy = Connector::connect().await.unwrap();
+
+            let result = proxy
+                .remote_call("orange", "login", JsonElem::Null)
+                .await
+                .unwrap();
+            log::trace!("[Process 5]: {}", result);
+            let mut actual = process5_result5.lock().await;
+            *actual = result;
+        });
+
+        let process6_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
+        let process6_result6 = process6_result.clone();
+        let process6 = tokio::spawn(async move {
+            wait_for_objects(vec!["orange".to_string()]).await.unwrap();
+            let proxy = Connector::connect().await.unwrap();
+
+            let mut param = HashMap::new();
+            param.insert(
+                "provider".to_string(),
+                JsonElem::String("microsoft".to_string()),
+            );
+
+            let result = proxy
+                .remote_call("orange", "login", JsonElem::HashMap(param))
+                .await
+                .unwrap();
+            log::trace!("[Process 6]: {}", result);
+            let mut actual = process6_result6.lock().await;
+            *actual = result;
+        });
+
+        let _ = tokio::join!(process2, process3, process4, process5, process6);
         process1.abort();
 
         let res2 = process2_result.lock().await;
@@ -307,6 +358,18 @@ mod tests {
         assert_eq!(
             *res4,
             JsonElem::String("This is my response from mango".into())
+        );
+
+        let res5 = process5_result.lock().await;
+        assert_eq!(
+            *res5,
+            JsonElem::String("This is my response from Orange".into())
+        );
+
+        let res6 = process6_result.lock().await;
+        assert_eq!(
+            *res6,
+            JsonElem::String("This is my response from Orange".into())
         );
     }
 }
