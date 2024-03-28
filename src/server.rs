@@ -401,11 +401,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_event() {
+        let result = Arc::new(Mutex::new(JsonElem::Null));
+        let inner = result.clone();
         let event_subscriber = tokio::spawn(async move {
             let event_listener = EventListener::dispatch().await.unwrap();
-            let _ = event_listener
+            event_listener
                 .listen("event", |param| async move {
                     log::info!("Event: {:?}", param);
+                    let mut var = inner.lock().await;
+
+                    *var = param;
+
                     Ok::<(), RemoteError>(())
                 })
                 .await
@@ -421,8 +427,14 @@ mod tests {
                 )
                 .await
                 .unwrap();
-            tokio::time::sleep(Duration::from_millis(1)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
         });
         let _ = tokio::join!(event_subscriber, event_sender);
+
+        let var = result.lock().await;
+        assert_eq!(
+            *var,
+            JsonElem::String("Sending you this event!!".to_string())
+        );
     }
 }

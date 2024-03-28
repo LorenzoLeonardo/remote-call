@@ -31,7 +31,7 @@ impl EventListener {
     pub async fn listen<
         F: Future<Output = Result<(), RE>> + Send,
         RE: std::error::Error + 'static + Send,
-        T: Fn(JsonElem) -> F + Send + Sync + 'static,
+        T: FnOnce(JsonElem) -> F + Send + Sync + Clone + 'static,
     >(
         &self,
         event_name: &str,
@@ -71,7 +71,8 @@ impl EventListener {
                 for data in sep {
                     if let Ok(msg) = serde_json::from_slice::<SocketMessage>(data.as_slice()) {
                         let param = serde_json::from_slice::<Event>(msg.body()).unwrap();
-                        match callback(param.param).await {
+                        let call = callback.clone();
+                        match call(param.param).await {
                             Ok(_) => {
                                 continue;
                             }
