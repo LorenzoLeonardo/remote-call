@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use atticus::run_actor;
+use atticus::{run_actor, Requestor};
 use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::{
@@ -11,6 +11,9 @@ use crate::{
 };
 
 use crate::objects::{ListObjects, RequestListObjects};
+
+pub type TransactionList = Arc<Mutex<HashMap<u64, Socket>>>;
+pub type TransactionId = Arc<Mutex<u64>>;
 
 pub async fn start_server() {
     let server_address = std::env::var(ENV_SERVER_ADDRESS).unwrap_or(SERVER_ADDRESS.to_owned());
@@ -47,123 +50,19 @@ pub async fn start_server() {
                 let sep = util::separate(data.as_slice());
                 for data in sep {
                     match serde_json::from_slice::<SocketMessage>(data.as_slice()) {
-                        Ok(mut msg) => match msg.kind() {
-                            MessageType::AddShareObjectRequest => {
-                                let mut id = inner_id_count.lock().await;
-                                *id += 1;
-                                msg = msg.set_id(*id);
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                                let res: Result<Option<SocketMessage>, atticus::Error> =
-                                    list_object_requestor
-                                        .request(RequestListObjects::Add(msg, socket.clone()))
-                                        .await;
-                                let msg = message::result_to_socket_message(
-                                    res,
-                                    MessageType::AddShareObjectResponse,
-                                );
-                                if socket.write(msg.as_bytes().as_slice()).await.is_err() {
-                                    break;
-                                }
+                        Ok(msg) => {
+                            if !process_message(
+                                msg,
+                                socket.clone(),
+                                inner_id_count.clone(),
+                                inner_list_call_object.clone(),
+                                list_object_requestor.clone(),
+                            )
+                            .await
+                            {
+                                break;
                             }
-                            MessageType::AddShareObjectResponse => {
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                            }
-                            MessageType::RemoteCallRequest => {
-                                let mut lst = inner_list_call_object.lock().await;
-                                let mut id = inner_id_count.lock().await;
-                                *id += 1;
-                                msg = msg.set_id(*id);
-                                lst.insert(*id, socket.clone());
-
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                                let res = list_object_requestor
-                                    .request(RequestListObjects::CallMethod(msg))
-                                    .await;
-                                match res {
-                                    Ok(res) => {
-                                        if let Some(res) = res {
-                                            if res.body() != SUCCESS.as_bytes() {
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    Err(err) => {
-                                        log::error!("{:?}", err);
-                                        break;
-                                    }
-                                }
-                            }
-                            MessageType::RemoteCallResponse => {
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                                let mut lst = inner_list_call_object.lock().await;
-                                if let Some(remote) = lst.get(&msg.id()) {
-                                    match serde_json::to_vec(&msg) {
-                                        Ok(data) => match remote.write(&data).await {
-                                            Ok(_res) => {
-                                                lst.remove(&msg.id());
-                                            }
-                                            Err(err) => {
-                                                log::error!("{:?}", err);
-                                                break;
-                                            }
-                                        },
-                                        Err(_) => todo!(),
-                                    }
-                                }
-                            }
-                            MessageType::SendEventRequest => {
-                                let mut id = inner_id_count.lock().await;
-                                *id += 1;
-                                msg = msg.set_id(*id);
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-
-                                let _ = list_object_requestor
-                                    .request(RequestListObjects::SendEvent(msg))
-                                    .await;
-                            }
-                            MessageType::SendEventResponse => {
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                            }
-                            MessageType::SubscribeEventRequest => {
-                                let mut id = inner_id_count.lock().await;
-                                *id += 1;
-                                msg = msg.set_id(*id);
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-
-                                let _ = list_object_requestor
-                                    .request(RequestListObjects::SubscribeEvent(
-                                        msg,
-                                        socket.clone(),
-                                    ))
-                                    .await;
-                            }
-                            MessageType::SubscribeEventResponse => {
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                            }
-                            MessageType::RemoveShareObjectRequest => {
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                            }
-                            MessageType::RemoveShareObjectResponse => {
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                            }
-                            MessageType::WaitForObject => {
-                                let mut id = inner_id_count.lock().await;
-                                *id += 1;
-                                msg = msg.set_id(*id);
-                                log::info!("[{}] {}", socket.ip_address(), msg);
-                                let res: Result<Option<SocketMessage>, atticus::Error> =
-                                    list_object_requestor
-                                        .request(RequestListObjects::WaitForObject(msg))
-                                        .await;
-                                let msg = message::result_to_socket_message(
-                                    res,
-                                    MessageType::WaitForObject,
-                                );
-                                if socket.write(msg.as_bytes().as_slice()).await.is_err() {
-                                    break;
-                                }
-                            }
-                        },
+                        }
                         Err(error) => {
                             log::error!(
                                 "Invalid message from {}: {}\nStream: {:?}",
@@ -182,6 +81,113 @@ pub async fn start_server() {
                 .await;
         });
     }
+}
+
+async fn process_message(
+    mut msg: SocketMessage,
+    socket: Socket,
+    inner_id_count: TransactionId,
+    inner_list_call_object: TransactionList,
+    list_object_requestor: Requestor<RequestListObjects, SocketMessage>,
+) -> bool {
+    match msg.kind() {
+        MessageType::AddShareObjectRequest => {
+            let mut id = inner_id_count.lock().await;
+            *id += 1;
+            msg = msg.set_id(*id);
+            log::info!("[{}] {}", socket.ip_address(), msg);
+            let res: Result<Option<SocketMessage>, atticus::Error> = list_object_requestor
+                .request(RequestListObjects::Add(msg, socket.clone()))
+                .await;
+            let msg = message::result_to_socket_message(res, MessageType::AddShareObjectResponse);
+            if socket.write(msg.as_bytes().as_slice()).await.is_err() {
+                return false;
+            }
+        }
+        MessageType::RemoteCallRequest => {
+            let mut lst = inner_list_call_object.lock().await;
+            let mut id = inner_id_count.lock().await;
+            *id += 1;
+            msg = msg.set_id(*id);
+            lst.insert(*id, socket.clone());
+
+            log::info!("[{}] {}", socket.ip_address(), msg);
+            let res = list_object_requestor
+                .request(RequestListObjects::CallMethod(msg))
+                .await;
+            match res {
+                Ok(res) => {
+                    if let Some(res) = res {
+                        if res.body() != SUCCESS.as_bytes() {
+                            return false;
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::error!("{:?}", err);
+                    return false;
+                }
+            }
+        }
+        MessageType::RemoteCallResponse => {
+            log::info!("[{}] {}", socket.ip_address(), msg);
+            let mut lst = inner_list_call_object.lock().await;
+            if let Some(remote) = lst.get(&msg.id()) {
+                match serde_json::to_vec(&msg) {
+                    Ok(data) => match remote.write(&data).await {
+                        Ok(_res) => {
+                            lst.remove(&msg.id());
+                        }
+                        Err(err) => {
+                            log::error!("{:?}", err);
+                            return false;
+                        }
+                    },
+                    Err(_) => todo!(),
+                }
+            }
+        }
+        MessageType::SendEventRequest => {
+            let mut id = inner_id_count.lock().await;
+            *id += 1;
+            msg = msg.set_id(*id);
+            log::info!("[{}] {}", socket.ip_address(), msg);
+
+            let _ = list_object_requestor
+                .request(RequestListObjects::SendEvent(msg))
+                .await;
+        }
+        MessageType::SendEventResponse => {
+            log::info!("[{}] {}", socket.ip_address(), msg);
+        }
+        MessageType::SubscribeEventRequest => {
+            let mut id = inner_id_count.lock().await;
+            *id += 1;
+            msg = msg.set_id(*id);
+            log::info!("[{}] {}", socket.ip_address(), msg);
+
+            let _ = list_object_requestor
+                .request(RequestListObjects::SubscribeEvent(msg, socket.clone()))
+                .await;
+        }
+        MessageType::WaitForObject => {
+            let mut id = inner_id_count.lock().await;
+            *id += 1;
+            msg = msg.set_id(*id);
+            log::info!("[{}] {}", socket.ip_address(), msg);
+            let res: Result<Option<SocketMessage>, atticus::Error> = list_object_requestor
+                .request(RequestListObjects::WaitForObject(msg))
+                .await;
+            let msg = message::result_to_socket_message(res, MessageType::WaitForObject);
+            if socket.write(msg.as_bytes().as_slice()).await.is_err() {
+                return false;
+            }
+        }
+        _ => {
+            unimplemented!("{:?}", msg.kind());
+        }
+    }
+    true
 }
 
 #[cfg(test)]
