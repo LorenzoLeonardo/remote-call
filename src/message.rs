@@ -127,10 +127,17 @@ pub fn result_to_socket_message(
             .set_body(err.to_string().as_bytes()),
     }
 }
+
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CallMethod {
     pub object: String,
     pub method: String,
+    pub param: JsonElem,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Event {
+    pub event: String,
     pub param: JsonElem,
 }
 

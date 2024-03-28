@@ -3,7 +3,7 @@ use tokio::net::TcpStream;
 
 use crate::{
     error::{CommonErrors, RemoteError},
-    message::{CallMethod, MessageType, SocketMessage},
+    message::{CallMethod, Event, MessageType, SocketMessage},
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
 };
 
@@ -72,5 +72,29 @@ impl Connector {
                 CommonErrors::InvalidResponseData.to_string(),
             )))
         }
+    }
+
+    /// Sends the event to the server and let the server
+    /// boadcast the message to all subscribed processes.
+    /// Parameters in JsonElem type.
+    pub async fn send_event(&self, event: &str, param: JsonElem) -> Result<(), RemoteError> {
+        let event = Event {
+            event: event.to_string(),
+            param,
+        };
+
+        let event_stream = serde_json::to_vec(&event)
+            .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
+
+        let msg = SocketMessage::new()
+            .set_kind(MessageType::SendEventRequest)
+            .set_body(event_stream.as_slice());
+        let stream = serde_json::to_vec(&msg)
+            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
+        self.socket
+            .write(stream.as_slice())
+            .await
+            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
+        Ok(())
     }
 }
