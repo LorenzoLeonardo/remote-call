@@ -50,6 +50,7 @@ pub enum Error {
     Atticus(atticus::Error),
     Others(String),
     Serde(serde_json::Error),
+    JsonElem(json_elem::error::Error),
 }
 
 impl std::error::Error for Error {}
@@ -61,6 +62,7 @@ impl Display for Error {
             Error::Atticus(err) => write!(f, "{}", err),
             Error::Others(err) => write!(f, "{}", err),
             Error::Serde(err) => write!(f, "{}", err),
+            Error::JsonElem(err) => write!(f, "{}", err),
         }
     }
 }
@@ -80,5 +82,11 @@ impl From<std::io::Error> for Error {
 impl From<serde_json::Error> for Error {
     fn from(value: serde_json::Error) -> Self {
         Self::Serde(value)
+    }
+}
+
+impl From<json_elem::error::Error> for Error {
+    fn from(value: json_elem::error::Error) -> Self {
+        Self::JsonElem(value)
     }
 }

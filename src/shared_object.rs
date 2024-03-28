@@ -5,7 +5,7 @@ use json_elem::JsonElem;
 use tokio::{net::TcpStream, sync::Mutex};
 
 use crate::{
-    error::{CommonErrors, RemoteError},
+    error::{CommonErrors, Error, RemoteError},
     message::{CallMethod, MessageType, SocketMessage},
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
     util,
@@ -16,12 +16,13 @@ pub trait SharedObject: Send + Sync + 'static {
     async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, RemoteError>;
 }
 
+type ListSharedObjects = Arc<Mutex<HashMap<String, Box<dyn SharedObject>>>>;
 /// An object that is responsible in registering the object to the IPC server,
 /// and spawning a tokio task to handling incoming remote method calls from
 /// other processes.
 pub struct SharedObjectDispatcher {
     socket: Socket,
-    list: Arc<Mutex<HashMap<String, Box<dyn SharedObject>>>>,
+    list: ListSharedObjects,
 }
 
 impl SharedObjectDispatcher {
@@ -80,76 +81,22 @@ impl SharedObjectDispatcher {
 
         loop {
             let mut buf = Vec::new();
-            let n = socket.read(&mut buf).await.map_or_else(
-                |e| {
-                    log::error!("{:?}", e);
-                    0
-                },
-                |size: usize| size,
-            );
+
+            if let Err(err) = socket.read(&mut buf).await {
+                log::error!("{:?}", err);
+                break;
+            }
 
             let sep = util::separate(buf.as_slice());
             for data in sep {
-                if n == 0 {
-                    log::error!("Error: {}", CommonErrors::ServerConnectionError.to_string());
-                    break;
-                } else if let Ok(mut msg) = serde_json::from_slice::<SocketMessage>(data.as_slice())
-                {
+                if let Ok(msg) = serde_json::from_slice::<SocketMessage>(data.as_slice()) {
                     if msg.kind() == MessageType::RemoteCallRequest {
-                        let val = list.lock().await;
-                        if let Ok(call) = serde_json::from_slice::<CallMethod>(msg.body()) {
-                            let response = if let Some(rem_call) = val.get(&call.object) {
-                                match rem_call.remote_call(&call.method, call.param).await {
-                                    Ok(response) => {
-                                        let body: Vec<u8> = response.try_into().unwrap();
-                                        msg = msg
-                                            .set_body(&body)
-                                            .set_kind(MessageType::RemoteCallResponse);
-                                        msg
-                                    }
-                                    Err(err) => {
-                                        let response = JsonElem::convert_from(&err).unwrap();
-                                        let body: Vec<u8> = response.try_into().unwrap();
-                                        msg = msg
-                                            .set_body(&body)
-                                            .set_kind(MessageType::RemoteCallResponse);
-                                        msg
-                                    }
-                                }
-                            } else {
-                                let err = RemoteError::new(JsonElem::String(
-                                    CommonErrors::ObjectNotFound.to_string(),
-                                ));
-                                let response = JsonElem::convert_from(&err).unwrap();
-                                let body: Vec<u8> = response.try_into().unwrap();
-                                msg = msg
-                                    .set_body(&body)
-                                    .set_kind(MessageType::RemoteCallResponse);
-                                msg
-                            };
-                            let stream = serde_json::to_vec(&response)
-                                .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))
-                                .unwrap();
-
-                            if socket.write(stream.as_slice()).await.is_err() {
-                                break;
-                            }
-                        } else {
-                            let err = RemoteError::new(JsonElem::String(
-                                CommonErrors::SerdeParseError.to_string(),
-                            ));
-                            let response = JsonElem::convert_from(&err).unwrap();
-                            let body: Vec<u8> = response.try_into().unwrap();
-                            msg = msg
-                                .set_body(&body)
-                                .set_kind(MessageType::RemoteCallResponse);
-
-                            let stream = serde_json::to_vec(&msg)
-                                .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))
-                                .unwrap();
-                            if socket.write(stream.as_slice()).await.is_err() {
-                                break;
-                            }
+                        if let Err(err) =
+                            Self::handle_remote_call_request(list.clone(), msg, socket.clone())
+                                .await
+                        {
+                            log::error!("Error handle_remote_call_request: {:?}", err);
+                            break;
                         }
                     }
                 } else {
@@ -174,5 +121,58 @@ impl SharedObjectDispatcher {
                 }
             }
         }
+    }
+
+    async fn handle_remote_call_request(
+        list: ListSharedObjects,
+        mut msg: SocketMessage,
+        socket: Socket,
+    ) -> Result<(), Error> {
+        let val = list.lock().await;
+        if let Ok(call) = serde_json::from_slice::<CallMethod>(msg.body()) {
+            let response = if let Some(rem_call) = val.get(&call.object) {
+                match rem_call.remote_call(&call.method, call.param).await {
+                    Ok(response) => {
+                        let body: Vec<u8> = response.try_into()?;
+                        msg = msg
+                            .set_body(&body)
+                            .set_kind(MessageType::RemoteCallResponse);
+                        msg
+                    }
+                    Err(err) => {
+                        let response = JsonElem::convert_from(&err)?;
+                        let body: Vec<u8> = response.try_into()?;
+                        msg = msg
+                            .set_body(&body)
+                            .set_kind(MessageType::RemoteCallResponse);
+                        msg
+                    }
+                }
+            } else {
+                let err =
+                    RemoteError::new(JsonElem::String(CommonErrors::ObjectNotFound.to_string()));
+                let response = JsonElem::convert_from(&err)?;
+                let body: Vec<u8> = response.try_into()?;
+                msg = msg
+                    .set_body(&body)
+                    .set_kind(MessageType::RemoteCallResponse);
+                msg
+            };
+            let stream = serde_json::to_vec(&response)?;
+
+            socket.write(stream.as_slice()).await?;
+        } else {
+            let err = RemoteError::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
+            let response = JsonElem::convert_from(&err)?;
+            let body: Vec<u8> = response.try_into()?;
+            msg = msg
+                .set_body(&body)
+                .set_kind(MessageType::RemoteCallResponse);
+
+            let stream = serde_json::to_vec(&msg)?;
+
+            socket.write(stream.as_slice()).await?;
+        }
+        Ok(())
     }
 }
