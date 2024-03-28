@@ -251,21 +251,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_server_shared_object_call_method() {
-        // The process that shares objects
-        let process1 = tokio::spawn(async move {
-            let mut shared = SharedObjectDispatcher::new().await.unwrap();
+        let mut shared = SharedObjectDispatcher::new().await.unwrap();
 
-            shared
-                .register_object("mango", Box::new(Mango))
-                .await
-                .unwrap();
-            shared
-                .register_object("orange", Box::new(Orange))
-                .await
-                .unwrap();
+        shared
+            .register_object("mango", Box::new(Mango))
+            .await
+            .unwrap();
+        shared
+            .register_object("orange", Box::new(Orange))
+            .await
+            .unwrap();
 
-            let _r = shared.spawn().await;
-        });
+        let process1 = shared.spawn().await;
 
         let process2_result = Arc::new(Mutex::new(JsonElem::String(String::new())));
         let process2_result2 = process2_result.clone();

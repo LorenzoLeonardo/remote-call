@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use json_elem::JsonElem;
-use tokio::{net::TcpStream, sync::Mutex};
+use tokio::{net::TcpStream, sync::Mutex, task::JoinHandle};
 
 use crate::{
     error::{CommonErrors, Error, RemoteError},
@@ -75,52 +75,40 @@ impl SharedObjectDispatcher {
     /// This handles remote object method call from other processess.
     /// It spawns a tokio task to handle the calls asynchronously and sends
     /// back the response back to the remote process.
-    pub async fn spawn(&mut self) {
+    pub async fn spawn(&mut self) -> JoinHandle<Result<(), Error>> {
         let socket = self.socket.clone();
         let list = self.list.clone();
 
-        loop {
-            let mut buf = Vec::new();
+        tokio::spawn(async move {
+            loop {
+                let mut buf = Vec::new();
+                socket.read(&mut buf).await?;
 
-            if let Err(err) = socket.read(&mut buf).await {
-                log::error!("{:?}", err);
-                break;
-            }
-
-            let sep = util::separate(buf.as_slice());
-            for data in sep {
-                if let Ok(msg) = serde_json::from_slice::<SocketMessage>(data.as_slice()) {
-                    if msg.kind() == MessageType::RemoteCallRequest {
-                        if let Err(err) =
+                let sep = util::separate(buf.as_slice());
+                for data in sep {
+                    if let Ok(msg) = serde_json::from_slice::<SocketMessage>(data.as_slice()) {
+                        if msg.kind() == MessageType::RemoteCallRequest {
                             Self::handle_remote_call_request(list.clone(), msg, socket.clone())
-                                .await
-                        {
-                            log::error!("Error handle_remote_call_request: {:?}", err);
-                            break;
+                                .await?;
                         }
-                    }
-                } else {
-                    log::error!("Invalid stream");
-                    let mut msg = SocketMessage::new();
-                    let err = RemoteError::new(JsonElem::String(
-                        CommonErrors::SerdeParseError.to_string(),
-                    ));
-                    let response = JsonElem::convert_from(&err).unwrap();
-                    let body: Vec<u8> = response.try_into().unwrap();
-                    msg = msg
-                        .set_body(&body)
-                        .set_kind(MessageType::RemoteCallResponse);
+                    } else {
+                        log::error!("Invalid stream");
+                        let mut msg = SocketMessage::new();
+                        let err = RemoteError::new(JsonElem::String(
+                            CommonErrors::SerdeParseError.to_string(),
+                        ));
+                        let response = JsonElem::convert_from(&err)?;
+                        let body: Vec<u8> = response.try_into()?;
+                        msg = msg
+                            .set_body(&body)
+                            .set_kind(MessageType::RemoteCallResponse);
 
-                    let stream = serde_json::to_vec(&msg)
-                        .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))
-                        .unwrap();
-                    if socket.write(stream.as_slice()).await.is_err() {
-                        break;
+                        let stream = serde_json::to_vec(&msg)?;
+                        socket.write(stream.as_slice()).await?;
                     }
-                    break;
                 }
             }
-        }
+        })
     }
 
     async fn handle_remote_call_request(
