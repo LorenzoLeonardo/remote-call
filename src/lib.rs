@@ -10,7 +10,7 @@ mod util;
 pub mod wait_for_object;
 
 pub use connector::Connector;
-pub use error::Error;
+pub use error::RemoteError;
 pub use server::start_server;
 pub use shared_object::{SharedObject, SharedObjectDispatcher};
 pub use wait_for_object::wait_for_objects;

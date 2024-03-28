@@ -6,24 +6,24 @@ use strum::{AsRefStr, Display, EnumString};
 
 /// An object that is responsible to house error in JsonElem type
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Error {
+pub struct RemoteError {
     error: JsonElem,
 }
 
-impl Error {
+impl RemoteError {
     /// Creates an Error object in JsonElem
     pub fn new(error: JsonElem) -> Self {
         Self { error }
     }
 }
 
-impl Display for Error {
+impl Display for RemoteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.error)
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for RemoteError {}
 
 /// A list of common error string.
 #[derive(Debug, EnumString, Display, AsRefStr)]

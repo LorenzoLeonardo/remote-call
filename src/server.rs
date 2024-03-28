@@ -173,7 +173,7 @@ mod tests {
 
     use crate::{
         connector::Connector,
-        error::Error,
+        error::RemoteError,
         logger::setup_logger,
         shared_object::{SharedObject, SharedObjectDispatcher},
         socket::ENV_SERVER_ADDRESS,
@@ -216,7 +216,11 @@ mod tests {
 
     #[async_trait]
     impl SharedObject for Mango {
-        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
+        async fn remote_call(
+            &self,
+            method: &str,
+            param: JsonElem,
+        ) -> Result<JsonElem, RemoteError> {
             log::trace!("[Mango] Method: {} Param: {:?}", method, param);
 
             Ok(JsonElem::String("This is my response from mango".into()))
@@ -227,7 +231,11 @@ mod tests {
 
     #[async_trait]
     impl SharedObject for Orange {
-        async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error> {
+        async fn remote_call(
+            &self,
+            method: &str,
+            param: JsonElem,
+        ) -> Result<JsonElem, RemoteError> {
             log::trace!("[Orange] Method: {} Param: {:?}", method, param);
 
             Ok(JsonElem::String("This is my response from Orange".into()))

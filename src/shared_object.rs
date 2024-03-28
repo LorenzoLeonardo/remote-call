@@ -5,7 +5,7 @@ use json_elem::JsonElem;
 use tokio::{net::TcpStream, sync::Mutex};
 
 use crate::{
-    error::{CommonErrors, Error},
+    error::{CommonErrors, RemoteError},
     message::{CallMethod, MessageType, SocketMessage},
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
     util,
@@ -13,7 +13,7 @@ use crate::{
 
 #[async_trait]
 pub trait SharedObject: Send + Sync + 'static {
-    async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, Error>;
+    async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, RemoteError>;
 }
 
 /// An object that is responsible in registering the object to the IPC server,
@@ -26,11 +26,11 @@ pub struct SharedObjectDispatcher {
 
 impl SharedObjectDispatcher {
     /// Create a new ObjectDispatcher object and connects to the IPC server.
-    pub async fn new() -> Result<Self, Error> {
+    pub async fn new() -> Result<Self, RemoteError> {
         let server_address = std::env::var(ENV_SERVER_ADDRESS).unwrap_or(SERVER_ADDRESS.to_owned());
         let stream = TcpStream::connect(server_address)
             .await
-            .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
+            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
         let addr = stream.peer_addr().unwrap();
         Ok(Self {
@@ -43,7 +43,7 @@ impl SharedObjectDispatcher {
         &mut self,
         object: &str,
         shared_object: Box<dyn SharedObject>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), RemoteError> {
         let mut list = self.list.lock().await;
 
         list.insert(object.to_string(), shared_object);
@@ -52,22 +52,22 @@ impl SharedObjectDispatcher {
             .set_kind(MessageType::AddShareObjectRequest)
             .set_body(object.as_bytes());
         let stream = serde_json::to_vec(&object)
-            .map_err(|err| Error::new(JsonElem::String(err.to_string())))?;
+            .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
 
         self.socket
             .write(stream.as_slice())
             .await
-            .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
+            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
         let mut buf = Vec::new();
         let n = self
             .socket
             .read(&mut buf)
             .await
-            .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
+            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
         let _ = serde_json::from_slice::<SocketMessage>(&buf[0..n])
-            .map_err(|e| Error::new(JsonElem::String(e.to_string())))?;
+            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
         Ok(())
     }
 
@@ -117,7 +117,7 @@ impl SharedObjectDispatcher {
                                     }
                                 }
                             } else {
-                                let err = Error::new(JsonElem::String(
+                                let err = RemoteError::new(JsonElem::String(
                                     CommonErrors::ObjectNotFound.to_string(),
                                 ));
                                 let response = JsonElem::convert_from(&err).unwrap();
@@ -128,14 +128,14 @@ impl SharedObjectDispatcher {
                                 msg
                             };
                             let stream = serde_json::to_vec(&response)
-                                .map_err(|err| Error::new(JsonElem::String(err.to_string())))
+                                .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))
                                 .unwrap();
 
                             if socket.write(stream.as_slice()).await.is_err() {
                                 break;
                             }
                         } else {
-                            let err = Error::new(JsonElem::String(
+                            let err = RemoteError::new(JsonElem::String(
                                 CommonErrors::SerdeParseError.to_string(),
                             ));
                             let response = JsonElem::convert_from(&err).unwrap();
@@ -145,7 +145,7 @@ impl SharedObjectDispatcher {
                                 .set_kind(MessageType::RemoteCallResponse);
 
                             let stream = serde_json::to_vec(&msg)
-                                .map_err(|err| Error::new(JsonElem::String(err.to_string())))
+                                .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))
                                 .unwrap();
                             if socket.write(stream.as_slice()).await.is_err() {
                                 break;
@@ -155,8 +155,9 @@ impl SharedObjectDispatcher {
                 } else {
                     log::error!("Invalid stream");
                     let mut msg = SocketMessage::new();
-                    let err =
-                        Error::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
+                    let err = RemoteError::new(JsonElem::String(
+                        CommonErrors::SerdeParseError.to_string(),
+                    ));
                     let response = JsonElem::convert_from(&err).unwrap();
                     let body: Vec<u8> = response.try_into().unwrap();
                     msg = msg
@@ -164,7 +165,7 @@ impl SharedObjectDispatcher {
                         .set_kind(MessageType::RemoteCallResponse);
 
                     let stream = serde_json::to_vec(&msg)
-                        .map_err(|err| Error::new(JsonElem::String(err.to_string())))
+                        .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))
                         .unwrap();
                     if socket.write(stream.as_slice()).await.is_err() {
                         break;
