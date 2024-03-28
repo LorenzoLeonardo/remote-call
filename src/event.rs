@@ -40,10 +40,8 @@ impl EventListener {
         let msg = SocketMessage::new()
             .set_kind(MessageType::SubscribeEventRequest)
             .set_body(event_name.as_bytes());
-        let stream = serde_json::to_vec(&msg)
-            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
         self.socket
-            .write(stream.as_slice())
+            .write(&msg.as_bytes())
             .await
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 

@@ -102,7 +102,7 @@ async fn process_message(
                 .request(RequestListObjects::Add(msg, socket.clone()))
                 .await;
             let msg = message::result_to_socket_message(res, MessageType::AddShareObjectResponse);
-            socket.write(msg.as_bytes().as_slice()).await?;
+            socket.write(&msg.as_bytes()).await?;
         }
         MessageType::RemoteCallRequest => {
             let mut lst = inner_list_call_object.lock().await;
@@ -164,7 +164,7 @@ async fn process_message(
                 .request(RequestListObjects::WaitForObject(msg))
                 .await;
             let msg = message::result_to_socket_message(res, MessageType::WaitForObject);
-            socket.write(msg.as_bytes().as_slice()).await?;
+            socket.write(&msg.as_bytes()).await?;
         }
         _ => {
             unimplemented!("{:?}", msg.kind());

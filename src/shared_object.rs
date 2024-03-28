@@ -103,8 +103,7 @@ impl SharedObjectDispatcher {
                             .set_body(&body)
                             .set_kind(MessageType::RemoteCallResponse);
 
-                        let stream = serde_json::to_vec(&msg)?;
-                        socket.write(stream.as_slice()).await?;
+                        socket.write(&msg.as_bytes()).await?;
                     }
                 }
             }
@@ -118,7 +117,7 @@ impl SharedObjectDispatcher {
     ) -> Result<(), Error> {
         let val = list.lock().await;
         if let Ok(call) = serde_json::from_slice::<CallMethod>(msg.body()) {
-            let response = if let Some(rem_call) = val.get(&call.object) {
+            let msg = if let Some(rem_call) = val.get(&call.object) {
                 match rem_call.remote_call(&call.method, call.param).await {
                     Ok(response) => {
                         let body: Vec<u8> = response.try_into()?;
@@ -146,9 +145,7 @@ impl SharedObjectDispatcher {
                     .set_kind(MessageType::RemoteCallResponse);
                 msg
             };
-            let stream = serde_json::to_vec(&response)?;
-
-            socket.write(stream.as_slice()).await?;
+            socket.write(&msg.as_bytes()).await?;
         } else {
             let err = RemoteError::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
             let response = JsonElem::convert_from(&err)?;
@@ -157,9 +154,7 @@ impl SharedObjectDispatcher {
                 .set_body(&body)
                 .set_kind(MessageType::RemoteCallResponse);
 
-            let stream = serde_json::to_vec(&msg)?;
-
-            socket.write(stream.as_slice()).await?;
+            socket.write(&msg.as_bytes()).await?;
         }
         Ok(())
     }

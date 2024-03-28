@@ -43,14 +43,12 @@ impl Connector {
         };
         let body = serde_json::to_vec(&call_method)
             .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
-        let request = SocketMessage::new()
+        let msg = SocketMessage::new()
             .set_kind(MessageType::RemoteCallRequest)
             .set_body(&body);
 
-        let stream = serde_json::to_vec(&request)
-            .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
         self.socket
-            .write(stream.as_slice())
+            .write(&msg.as_bytes())
             .await
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
@@ -89,11 +87,9 @@ impl Connector {
         let msg = SocketMessage::new()
             .set_kind(MessageType::SendEventRequest)
             .set_body(event_stream.as_slice());
-        let stream = serde_json::to_vec(&msg)
-            .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
         self.socket
-            .write(stream.as_slice())
+            .write(&msg.as_bytes())
             .await
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
         Ok(())
