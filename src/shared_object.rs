@@ -148,6 +148,7 @@ impl SharedObjectDispatcher {
                     }
                 }
             } else {
+                log::error!("Invalid stream");
                 let mut msg = SocketMessage::new();
                 let err = Error::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
                 let response = JsonElem::convert_from(&err).unwrap();
@@ -162,6 +163,7 @@ impl SharedObjectDispatcher {
                 if socket.write(stream.as_slice()).await.is_err() {
                     break;
                 }
+                break;
             }
         }
     }

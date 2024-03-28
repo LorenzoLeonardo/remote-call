@@ -42,7 +42,6 @@ pub async fn wait_for_objects(list: Vec<String>) -> Result<(), Error> {
             if reply.body() == SUCCESS.as_bytes() {
                 break;
             } else {
-                tokio::task::yield_now().await;
                 continue;
             }
         }
