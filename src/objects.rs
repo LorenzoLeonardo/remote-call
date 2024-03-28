@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use atticus::Actor;
 
 use crate::{
-    message::{CallMethod, MessageType, SocketMessage},
+    message::{CallMethod, Event, MessageType, SocketMessage},
     socket::Socket,
 };
 
@@ -18,6 +18,8 @@ pub enum RequestListObjects {
     Remove(Socket),
     CallMethod(SocketMessage),
     WaitForObject(SocketMessage),
+    SubscribeEvent(SocketMessage, Socket),
+    SendEvent(SocketMessage),
 }
 
 pub const SUCCESS: &str = "success";
@@ -29,6 +31,7 @@ impl ListObjects {
             events: HashMap::new(),
         }
     }
+
     pub fn add(&mut self, msg: SocketMessage, socket: Socket) -> SocketMessage {
         match String::from_utf8(msg.body().into()) {
             Ok(object) => {
@@ -102,6 +105,41 @@ impl ListObjects {
             }
         }
     }
+
+    pub fn subscribe_event(&mut self, msg: SocketMessage, socket: Socket) -> SocketMessage {
+        match String::from_utf8(msg.body().into()) {
+            Ok(event_name) => {
+                self.events.insert(event_name, socket);
+                msg.set_body(SUCCESS.as_bytes())
+                    .set_kind(MessageType::SubscribeEventResponse)
+            }
+            Err(err) => {
+                log::error!("ListObjects::subscribe_event(): {:?}", err);
+                msg.set_body("failed".as_bytes())
+                    .set_kind(MessageType::SubscribeEventResponse)
+            }
+        }
+    }
+
+    pub async fn send_event(&mut self, msg: SocketMessage) -> SocketMessage {
+        match serde_json::from_slice::<Event>(msg.body()) {
+            Ok(event) => {
+                for (event_name, socket) in &self.events {
+                    if *event_name == event.event {
+                        let stream = serde_json::to_vec(&msg).unwrap();
+                        let _ = socket.write(stream.as_slice()).await;
+                    }
+                }
+                msg.set_body(SUCCESS.as_bytes())
+                    .set_kind(MessageType::SendEventResponse)
+            }
+            Err(err) => {
+                log::error!("ListObjects::send_event(): {:?}", err);
+                msg.set_body("failed".as_bytes())
+                    .set_kind(MessageType::SendEventResponse)
+            }
+        }
+    }
 }
 #[async_trait]
 impl Actor for ListObjects {
@@ -114,6 +152,10 @@ impl Actor for ListObjects {
             RequestListObjects::Remove(msg) => Some(self.remove(msg)),
             RequestListObjects::CallMethod(msg) => Some(self.call_method(msg).await),
             RequestListObjects::WaitForObject(msg) => Some(self.wait_for_object(msg).await),
+            RequestListObjects::SubscribeEvent(msg, socket) => {
+                Some(self.subscribe_event(msg, socket))
+            }
+            RequestListObjects::SendEvent(msg) => Some(self.send_event(msg).await),
         }
     }
 }

@@ -91,6 +91,7 @@ impl Connector {
             .set_body(event_stream.as_slice());
         let stream = serde_json::to_vec(&msg)
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
+
         self.socket
             .write(stream.as_slice())
             .await

@@ -112,15 +112,32 @@ pub async fn start_server() {
                                 }
                             }
                             MessageType::SendEventRequest => {
+                                let mut id = inner_id_count.lock().await;
+                                *id += 1;
+                                msg = msg.set_id(*id);
                                 log::info!("[{}] {}", socket.ip_address(), msg);
+
+                                let _ = list_object_requestor
+                                    .request(RequestListObjects::SendEvent(msg))
+                                    .await;
                             }
                             MessageType::SendEventResponse => {
                                 log::info!("[{}] {}", socket.ip_address(), msg);
                             }
-                            MessageType::RegisterEventRequest => {
+                            MessageType::SubscribeEventRequest => {
+                                let mut id = inner_id_count.lock().await;
+                                *id += 1;
+                                msg = msg.set_id(*id);
                                 log::info!("[{}] {}", socket.ip_address(), msg);
+
+                                let _ = list_object_requestor
+                                    .request(RequestListObjects::SubscribeEvent(
+                                        msg,
+                                        socket.clone(),
+                                    ))
+                                    .await;
                             }
-                            MessageType::RegisterEventResponse => {
+                            MessageType::SubscribeEventResponse => {
                                 log::info!("[{}] {}", socket.ip_address(), msg);
                             }
                             MessageType::RemoveShareObjectRequest => {
