@@ -283,7 +283,8 @@ mod tests {
             *actual = result;
         });
 
-        let _ = tokio::join!(process1, process2, process3, process4);
+        let _ = tokio::join!(process2, process3, process4);
+        process1.abort();
 
         let res2 = process2_result.lock().await;
         assert_eq!(
