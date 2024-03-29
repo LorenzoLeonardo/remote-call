@@ -7,6 +7,7 @@ use tokio::{net::TcpStream, sync::Mutex, task::JoinHandle};
 use crate::{
     error::{CommonErrors, Error, RemoteError},
     message::{CallMethod, MessageType, SocketMessage},
+    objects::FAILED,
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
     util,
 };
@@ -65,8 +66,16 @@ impl SharedObjectDispatcher {
             .await
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
 
-        let _ = serde_json::from_slice::<SocketMessage>(&buf[0..n])
+        let msg = serde_json::from_slice::<SocketMessage>(&buf[0..n])
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
+
+        if msg.kind() == MessageType::AddShareObjectResponse {
+            if msg.body() == FAILED.as_bytes() {
+                panic!("Registering of {} failed!", object);
+            }
+        } else {
+            panic!("Invalid message from server. {:?}", msg);
+        }
         Ok(())
     }
 
