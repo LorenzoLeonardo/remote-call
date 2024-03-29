@@ -113,17 +113,13 @@ async fn process_message(
             lst.insert(*id, socket.clone());
 
             log::info!("[{}] {}", socket.ip_address(), msg);
-            list_object_requestor
+            let res = list_object_requestor
                 .request(RequestListObjects::CallMethod(msg))
                 .await?
-                .ok_or(Error::Others("No message".to_string()))
-                .and_then(|res| {
-                    if res.body() != SUCCESS.as_bytes() {
-                        Err(Error::Others(format!("body is {:?}", res.body())))
-                    } else {
-                        Ok(())
-                    }
-                })?;
+                .ok_or(Error::Others("No message".to_string()))?;
+            if res.body() != SUCCESS.as_bytes() {
+                socket.write(&res.as_bytes()).await?;
+            }
         }
         MessageType::RemoteCallResponse => {
             log::info!("[{}] {}", socket.ip_address(), msg);
@@ -180,7 +176,7 @@ mod tests {
 
     use crate::{
         connector::Connector,
-        error::RemoteError,
+        error::{CommonErrors, RemoteError},
         logger::setup_logger,
         shared_object::{SharedObject, SharedObjectDispatcher},
         socket::ENV_SERVER_ADDRESS,
@@ -250,6 +246,25 @@ mod tests {
         }
     }
 
+    struct Apple;
+
+    #[async_trait]
+    impl SharedObject for Apple {
+        async fn remote_call(
+            &self,
+            method: &str,
+            param: JsonElem,
+        ) -> Result<JsonElem, RemoteError> {
+            log::trace!("[Apple] Method: {} Param: {:?}", method, param);
+
+            Err(RemoteError::new(JsonElem::String(
+                "exception happend".to_string(),
+            )))
+        }
+    }
+
+    //Error::new(JsonElem::String("exception happend".to_string())
+
     #[tokio::test]
     async fn test_server_shared_object_call_method() {
         let mut shared = SharedObjectDispatcher::new().await.unwrap();
@@ -260,6 +275,11 @@ mod tests {
             .unwrap();
         shared
             .register_object("orange", Box::new(Orange))
+            .await
+            .unwrap();
+
+        shared
+            .register_object("apple", Box::new(Apple))
             .await
             .unwrap();
 
@@ -352,7 +372,30 @@ mod tests {
             *actual = result;
         });
 
-        let _ = tokio::join!(process2, process3, process4, process5, process6);
+        let process7_result = Arc::new(Mutex::new(RemoteError::new(JsonElem::String(
+            String::new(),
+        ))));
+        let process7_result7 = process7_result.clone();
+        let process7 = tokio::spawn(async move {
+            wait_for_objects(vec!["apple".to_string()]).await.unwrap();
+            let proxy = Connector::connect().await.unwrap();
+
+            let mut param = HashMap::new();
+            param.insert(
+                "provider".to_string(),
+                JsonElem::String("microsoft".to_string()),
+            );
+
+            let result = proxy
+                .remote_call("apple", "login", JsonElem::HashMap(param))
+                .await
+                .unwrap_err();
+            log::trace!("[Process 7]: {}", result);
+            let mut actual = process7_result7.lock().await;
+            *actual = result;
+        });
+
+        let _ = tokio::join!(process2, process3, process4, process5, process6, process7);
         process1.abort();
 
         let res2 = process2_result.lock().await;
@@ -383,6 +426,12 @@ mod tests {
         assert_eq!(
             *res6,
             JsonElem::String("This is my response from Orange".into())
+        );
+
+        let res7 = process7_result.lock().await;
+        assert_eq!(
+            *res7,
+            RemoteError::new(JsonElem::String("exception happend".to_string()))
         );
     }
 
@@ -422,6 +471,20 @@ mod tests {
         assert_eq!(
             *var,
             JsonElem::String("Sending you this event!!".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_shared_object_call_method() {
+        let sender = Connector::connect().await.unwrap();
+        let result = sender
+            .remote_call("no object", "login", JsonElem::Null)
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            result,
+            RemoteError::new(JsonElem::String(CommonErrors::ObjectNotFound.to_string()))
         );
     }
 }
