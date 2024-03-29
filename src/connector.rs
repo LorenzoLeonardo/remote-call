@@ -61,9 +61,13 @@ impl Connector {
         let resp = serde_json::from_slice::<SocketMessage>(&buf[0..n])
             .map_err(|e| RemoteError::new(JsonElem::String(e.to_string())))?;
         if resp.kind() == MessageType::RemoteCallResponse {
-            let json = JsonElem::try_from(resp.body())
-                .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
-            Ok(json)
+            if let Ok(err) = serde_json::from_slice::<RemoteError>(resp.body()) {
+                Err(err)
+            } else {
+                let json = JsonElem::try_from(resp.body())
+                    .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?;
+                Ok(json)
+            }
         } else {
             Err(RemoteError::new(JsonElem::String(
                 CommonErrors::InvalidResponseData.to_string(),

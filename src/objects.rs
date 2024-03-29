@@ -2,10 +2,13 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use atticus::Actor;
+use json_elem::JsonElem;
 
 use crate::{
+    error::CommonErrors,
     message::{CallMethod, Event, MessageType, SocketMessage},
     socket::Socket,
+    RemoteError,
 };
 
 pub struct ListObjects {
@@ -73,13 +76,18 @@ impl ListObjects {
                         }
                     }
                 } else {
-                    msg.set_body(FAILED.as_bytes())
+                    let err = RemoteError::new(JsonElem::String(
+                        CommonErrors::ObjectNotFound.to_string(),
+                    ));
+                    msg.set_body(&err.as_bytes())
                         .set_kind(MessageType::RemoteCallResponse)
                 }
             }
             Err(err) => {
                 log::error!("ListObjects::call_method(): {:?}", err);
-                msg.set_body(FAILED.as_bytes())
+                let err =
+                    RemoteError::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
+                msg.set_body(&err.as_bytes())
                     .set_kind(MessageType::AddShareObjectResponse)
             }
         }
