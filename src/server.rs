@@ -101,7 +101,8 @@ async fn process_message(
             let res: Result<Option<SocketMessage>, atticus::Error> = list_object_requestor
                 .request(RequestListObjects::Add(msg, socket.clone()))
                 .await;
-            let msg = message::result_to_socket_message(res, MessageType::AddShareObjectResponse);
+            let msg =
+                message::result_to_socket_message(res, *id, MessageType::AddShareObjectResponse);
             socket.write(&msg.as_bytes()).await?;
         }
         MessageType::RemoteCallRequest => {
@@ -163,7 +164,7 @@ async fn process_message(
             let res: Result<Option<SocketMessage>, atticus::Error> = list_object_requestor
                 .request(RequestListObjects::WaitForObject(msg))
                 .await;
-            let msg = message::result_to_socket_message(res, MessageType::WaitForObject);
+            let msg = message::result_to_socket_message(res, *id, MessageType::WaitForObject);
             socket.write(&msg.as_bytes()).await?;
         }
         _ => {

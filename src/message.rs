@@ -118,11 +118,13 @@ impl Display for SocketMessage {
 }
 pub fn result_to_socket_message(
     res: Result<Option<SocketMessage>, atticus::Error>,
+    id: u64,
     msg_type: MessageType,
 ) -> SocketMessage {
     match res {
         Ok(respon) => respon.unwrap(),
         Err(err) => SocketMessage::new()
+            .set_id(id)
             .set_kind(msg_type)
             .set_body(err.to_string().as_bytes()),
     }
