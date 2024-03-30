@@ -7,7 +7,7 @@ use strum::{AsRefStr, Display, EnumString};
 /// An object that is responsible to house error in JsonElem type
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct RemoteError {
-    error: JsonElem,
+    pub error: JsonElem,
 }
 
 impl RemoteError {
