@@ -1,49 +1,14 @@
 use std::env;
 
 use json_elem::JsonElem;
-use remote_call::logger::ENV_LOGGER;
 use remote_call::Connector;
-
-pub fn setup_logger() {
-    let level = std::env::var(ENV_LOGGER)
-        .map(|var| match var.to_lowercase().as_str() {
-            "trace" => log::LevelFilter::Trace,
-            "debug" => log::LevelFilter::Debug,
-            "info" => log::LevelFilter::Info,
-            "warn" => log::LevelFilter::Warn,
-            "error" => log::LevelFilter::Error,
-            "off" => log::LevelFilter::Off,
-            _ => log::LevelFilter::Info,
-        })
-        .unwrap_or_else(|_| log::LevelFilter::Info);
-
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{}][{:<5}][{}:{:<3}]: {}",
-                chrono::Local::now().format("%H:%M:%S%.9f"),
-                record.level(),
-                record.file().unwrap_or_default(),
-                record.line().unwrap_or_default(),
-                message
-            ))
-        })
-        .level(level)
-        .chain(std::io::stdout())
-        .apply()
-        .unwrap_or_else(|e| {
-            panic!("{:?}", e);
-        });
-}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    setup_logger();
-
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 3 {
-        log::error!("Incomplete parameters! -> remote.exe <object_name> <method> <parameters in JSON format>");
+        println!("Incomplete parameters! -> remote.exe <object_name> <method> <parameters in JSON format>");
         return;
     }
     let object = args[1].as_str();
@@ -59,7 +24,37 @@ async fn main() {
 
     let result = proxy.remote_call(object, method, param).await;
     match result {
-        Ok(res) => log::info!("Success: {}", res),
-        Err(err) => log::error!("Error: {}", err),
+        Ok(res) => {
+            print!("Result: ");
+            print_recursive(&res, 0);
+        }
+        Err(err) => {
+            print!("Error: ");
+            print_recursive(&JsonElem::convert_from(&err).unwrap(), 0);
+        }
+    }
+}
+
+fn print_recursive(value: &JsonElem, indent: usize) {
+    match value {
+        JsonElem::Null => println!("null"),
+        JsonElem::Bool(b) => println!("{}", b),
+        JsonElem::Integer(n) => println!("{}", n),
+        JsonElem::String(s) => println!("\"{}\"", s),
+        JsonElem::Vec(arr) => {
+            println!("List");
+            for element in arr {
+                print!("{}", " ".repeat(indent + 2));
+                print_recursive(element, indent + 2);
+            }
+        }
+        JsonElem::Float(f) => println!("{}", f),
+        JsonElem::HashMap(obj) => {
+            println!("Map");
+            for (key, val) in obj {
+                print!("{}{}: ", " ".repeat(indent + 2), key);
+                print_recursive(val, indent + 2);
+            }
+        }
     }
 }
