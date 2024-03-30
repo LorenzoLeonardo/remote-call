@@ -30,7 +30,7 @@ async fn main() {
         }
         Err(err) => {
             print!("Error: ");
-            print_recursive(&JsonElem::convert_from(&err).unwrap(), 0);
+            print_recursive(&err.error, 0);
         }
     }
 }
