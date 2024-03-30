@@ -364,10 +364,7 @@ dependencies = [
 name = "remote"
 version = "0.1.0"
 dependencies = [
- "chrono",
- "fern",
  "json-elem",
- "log",
  "remote-call",
  "tokio",
 ]
