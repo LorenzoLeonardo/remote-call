@@ -185,18 +185,10 @@ impl SharedObject for ListObject {
                     .0
                     .request(RequestListObjects::ListObject)
                     .await
-                    .map_err(|err| {
-                        log::error!("{:?}", err);
-                        RemoteError::new(JsonElem::String(err.to_string()))
-                    })?
-                    .ok_or_else(|| {
-                        log::error!("No List");
-                        RemoteError::new(JsonElem::String("No list".to_string()))
-                    })?;
-                Ok(JsonElem::try_from(result.body()).map_err(|err| {
-                    log::error!("{:?}", err);
-                    RemoteError::new(JsonElem::String(err.to_string()))
-                })?)
+                    .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?
+                    .ok_or_else(|| RemoteError::new(JsonElem::String("No list".to_string())))?;
+                Ok(JsonElem::try_from(result.body())
+                    .map_err(|err| RemoteError::new(JsonElem::String(err.to_string())))?)
             }
             _ => Err(RemoteError::new(JsonElem::String(format!(
                 "{} method not found.",
