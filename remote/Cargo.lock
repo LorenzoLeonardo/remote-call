@@ -213,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "json-elem"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d9d86e21d762b32addf092472baa8bebb9e66b352f5dfcb93f0e237a90617cb"
+checksum = "77c68cffb562d71323d92c94f948cbb0157d8dfcda52599511d938abad939e19"
 dependencies = [
  "serde",
  "serde_derive",
@@ -372,7 +372,7 @@ dependencies = [
 [[package]]
 name = "remote-call"
 version = "0.1.0"
-source = "git+https://github.com/LorenzoLeonardo/remote-call.git?branch=master#9f294581c8c9e8f63c4e7d08653de672ff39b370"
+source = "git+https://github.com/LorenzoLeonardo/remote-call.git?branch=master#21de8535b61f375d8d82d2faae35fc4e31a57136"
 dependencies = [
  "async-trait",
  "atticus",

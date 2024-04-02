@@ -25,36 +25,10 @@ async fn main() {
     let result = proxy.remote_call(object, method, param).await;
     match result {
         Ok(res) => {
-            print!("Result: ");
-            print_recursive(&res, 0);
+            res.print(0);
         }
         Err(err) => {
-            print!("Error: ");
-            print_recursive(&JsonElem::convert_from(&err).unwrap(), 0);
-        }
-    }
-}
-
-fn print_recursive(value: &JsonElem, indent: usize) {
-    match value {
-        JsonElem::Null => println!("null"),
-        JsonElem::Bool(b) => println!("{}", b),
-        JsonElem::Integer(n) => println!("{}", n),
-        JsonElem::String(s) => println!("\"{}\"", s),
-        JsonElem::Vec(arr) => {
-            println!("List");
-            for element in arr {
-                print!("{}", " ".repeat(indent + 2));
-                print_recursive(element, indent + 2);
-            }
-        }
-        JsonElem::Float(f) => println!("{}", f),
-        JsonElem::HashMap(obj) => {
-            println!("Map");
-            for (key, val) in obj {
-                print!("{}{}: ", " ".repeat(indent + 2), key);
-                print_recursive(val, indent + 2);
-            }
+            println!("Exception Error: {}", err);
         }
     }
 }
