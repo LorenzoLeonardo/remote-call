@@ -23,6 +23,7 @@ pub enum RequestListObjects {
     WaitForObject(SocketMessage),
     SubscribeEvent(SocketMessage, Socket),
     SendEvent(SocketMessage),
+    ListObject,
 }
 
 pub const SUCCESS: &str = "success";
@@ -146,6 +147,17 @@ impl ListObjects {
             }
         }
     }
+
+    pub fn list_objects(&self) -> SocketMessage {
+        let mut list = Vec::new();
+
+        for (key, _value) in self.objects.iter() {
+            list.push(key.to_string());
+        }
+        let slice =
+            serde_json::to_vec(&list).unwrap_or_else(|err| err.to_string().as_bytes().to_vec());
+        SocketMessage::new().set_body(slice.as_slice())
+    }
 }
 #[async_trait]
 impl Actor for ListObjects {
@@ -162,6 +174,7 @@ impl Actor for ListObjects {
                 Some(self.subscribe_event(msg, socket))
             }
             RequestListObjects::SendEvent(msg) => Some(self.send_event(msg).await),
+            RequestListObjects::ListObject => Some(self.list_objects()),
         }
     }
 }

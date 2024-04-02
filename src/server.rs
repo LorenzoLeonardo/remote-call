@@ -1,6 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use atticus::{run_actor, Requestor};
+use json_elem::JsonElem;
 use tokio::{net::TcpListener, sync::Mutex};
 
 use crate::{
@@ -8,7 +10,7 @@ use crate::{
     message::{self, MessageType, SocketMessage},
     objects::SUCCESS,
     socket::{Socket, ENV_SERVER_ADDRESS, SERVER_ADDRESS},
-    util,
+    util, RemoteError, SharedObject, SharedObjectDispatcher,
 };
 
 use crate::objects::{ListObjects, RequestListObjects};
@@ -25,6 +27,7 @@ pub async fn start_server() {
     let id_count = Arc::new(Mutex::new(0_u64));
     let res = run_actor(ListObjects::new(), 1);
 
+    start_share_list_objects(res.requestor.clone()).await;
     loop {
         let (socket, addr) = listener.accept().await.unwrap();
         let socket = Socket::new(socket, addr);
@@ -168,6 +171,52 @@ async fn process_message(
         }
     }
     Ok(())
+}
+
+struct ListObject(Requestor<RequestListObjects, SocketMessage>);
+
+#[async_trait]
+impl SharedObject for ListObject {
+    async fn remote_call(&self, method: &str, param: JsonElem) -> Result<JsonElem, RemoteError> {
+        log::trace!("Method: {} Param: {:?}", method, param);
+        match method {
+            "listObjects" => {
+                let result = self
+                    .0
+                    .request(RequestListObjects::ListObject)
+                    .await
+                    .map_err(|err| {
+                        log::error!("{:?}", err);
+                        RemoteError::new(JsonElem::String(err.to_string()))
+                    })?
+                    .ok_or_else(|| {
+                        log::error!("No List");
+                        RemoteError::new(JsonElem::String("No list".to_string()))
+                    })?;
+                Ok(JsonElem::try_from(result.body()).map_err(|err| {
+                    log::error!("{:?}", err);
+                    RemoteError::new(JsonElem::String(err.to_string()))
+                })?)
+            }
+            _ => Err(RemoteError::new(JsonElem::String(format!(
+                "{} method not found.",
+                method
+            )))),
+        }
+    }
+}
+
+async fn start_share_list_objects(requestor: Requestor<RequestListObjects, SocketMessage>) {
+    tokio::spawn(async move {
+        let mut shared = SharedObjectDispatcher::new().await.unwrap();
+        let object = ListObject(requestor);
+
+        shared
+            .register_object("list", Box::new(object))
+            .await
+            .unwrap();
+        shared.spawn().await;
+    });
 }
 
 #[cfg(test)]
