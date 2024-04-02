@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.37", features = ["full"] }
-remote-call = {git = "https://github.com/LorenzoLeonardo/remote-call.git", branch = "master"}
+remote-call = { path = "../../remote-call" }
 json-elem = "0.1"

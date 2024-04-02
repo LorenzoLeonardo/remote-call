@@ -213,9 +213,9 @@ dependencies = [
 
 [[package]]
 name = "json-elem"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d9d86e21d762b32addf092472baa8bebb9e66b352f5dfcb93f0e237a90617cb"
+checksum = "77c68cffb562d71323d92c94f948cbb0157d8dfcda52599511d938abad939e19"
 dependencies = [
  "serde",
  "serde_derive",
@@ -358,6 +358,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4722d768eff46b75989dd134e5c353f0d6296e5aaa3132e776cbdb56be7731aa"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "remote"
+version = "0.1.0"
+dependencies = [
+ "json-elem",
+ "remote-call",
+ "tokio",
 ]
 
 [[package]]

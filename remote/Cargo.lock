@@ -372,7 +372,6 @@ dependencies = [
 [[package]]
 name = "remote-call"
 version = "0.1.0"
-source = "git+https://github.com/LorenzoLeonardo/remote-call.git?branch=master#354eb173b5c1a3879df7e2fadd44d6f0841d1f7e"
 dependencies = [
  "async-trait",
  "atticus",
