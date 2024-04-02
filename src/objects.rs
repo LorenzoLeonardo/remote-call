@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use atticus::Actor;
 use json_elem::JsonElem;
+use serde::Serialize;
 
 use crate::{
     error::CommonErrors,
@@ -149,13 +150,19 @@ impl ListObjects {
     }
 
     pub fn list_objects(&self) -> SocketMessage {
-        let mut list = Vec::new();
-
-        for (key, _value) in self.objects.iter() {
-            list.push(key.to_string());
+        #[derive(Serialize)]
+        struct Object {
+            objects: Vec<String>,
         }
+        let mut objects = Vec::new();
+
+        for (key, _) in self.objects.iter() {
+            objects.push(key.to_string());
+        }
+        let object = Object { objects };
         let slice =
-            serde_json::to_vec(&list).unwrap_or_else(|err| err.to_string().as_bytes().to_vec());
+            serde_json::to_vec(&object).unwrap_or_else(|err| err.to_string().as_bytes().to_vec());
+
         SocketMessage::new().set_body(slice.as_slice())
     }
 }
