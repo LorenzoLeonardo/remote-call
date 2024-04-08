@@ -71,7 +71,7 @@ impl ListObjects {
                             .set_body(SUCCESS.as_bytes())
                             .set_kind(MessageType::RemoteCallResponse),
                         Err(err) => {
-                            log::error!("ListObjects::call_method: {:?}", err);
+                            log::error!("ListObjects::call_method: {}", err);
                             let _ = self.remove(remote.clone());
                             msg.set_body("remote connection error".as_bytes())
                                 .set_kind(MessageType::RemoteCallResponse)
@@ -86,7 +86,7 @@ impl ListObjects {
                 }
             }
             Err(err) => {
-                log::error!("ListObjects::call_method(): {:?}", err);
+                log::error!("ListObjects::call_method(): {}", err);
                 let err =
                     RemoteError::new(JsonElem::String(CommonErrors::SerdeParseError.to_string()));
                 msg.set_body(&err.as_bytes())
@@ -107,7 +107,7 @@ impl ListObjects {
                 }
             }
             Err(err) => {
-                log::error!("ListObjects::wait_for_object(): {:?}", err);
+                log::error!("ListObjects::wait_for_object(): {}", err);
                 msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::WaitForObject)
             }
@@ -122,7 +122,7 @@ impl ListObjects {
                     .set_kind(MessageType::SubscribeEventResponse)
             }
             Err(err) => {
-                log::error!("ListObjects::subscribe_event(): {:?}", err);
+                log::error!("ListObjects::subscribe_event(): {}", err);
                 msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::SubscribeEventResponse)
             }
@@ -142,7 +142,7 @@ impl ListObjects {
                     .set_kind(MessageType::SendEventResponse)
             }
             Err(err) => {
-                log::error!("ListObjects::send_event(): {:?}", err);
+                log::error!("ListObjects::send_event(): {}", err);
                 msg.set_body(FAILED.as_bytes())
                     .set_kind(MessageType::SendEventResponse)
             }
