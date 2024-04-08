@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use atticus::{run_actor, Requestor};
+use atticus::{actor, Requestor};
 use json_elem::JsonElem;
 use tokio::{net::TcpListener, sync::Mutex};
 
@@ -25,7 +25,7 @@ pub async fn start_server() {
     log::trace!("Server listening on {}", server_address);
     let list_call_object = Arc::new(Mutex::new(HashMap::<u64, Socket>::new()));
     let id_count = Arc::new(Mutex::new(0_u64));
-    let res = run_actor(ListObjects::new(), 1);
+    let res = actor::run(ListObjects::new(), 1);
 
     start_share_list_objects(res.requestor.clone()).await;
     loop {
