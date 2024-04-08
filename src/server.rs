@@ -47,7 +47,7 @@ pub async fn start_server() {
                         }
                     }
                     Err(err) => {
-                        log::error!("{:?}", err);
+                        log::error!("{}", err);
                         break;
                     }
                 }
@@ -64,7 +64,7 @@ pub async fn start_server() {
                             )
                             .await
                             {
-                                log::error!("Error process_message: {:?}", err);
+                                log::error!("Error process_message: {}", err);
                                 break;
                             }
                         }
