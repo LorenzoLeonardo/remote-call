@@ -18,7 +18,7 @@ readme = "README.md"
 
 [dependencies]
 async-trait = "0.1"
-atticus = "0.2.0"
+atticus = "0.2"
 chrono = "0.4"
 ctor = "0.2"
 derive-deref-rs = "0.1"
