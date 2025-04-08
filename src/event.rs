@@ -59,10 +59,7 @@ impl EventListener {
                         0
                     });
                 if n == 0 {
-                    log::error!(
-                        "listen Error: {}",
-                        CommonErrors::ServerConnectionError.to_string()
-                    );
+                    log::error!("listen Error: {}", CommonErrors::ServerConnectionError);
                     break;
                 }
                 let sep = util::separate(buf.as_slice());
@@ -80,10 +77,7 @@ impl EventListener {
                             }
                         }
                     } else {
-                        log::error!(
-                            " listenError: {}",
-                            CommonErrors::SerdeParseError.to_string()
-                        );
+                        log::error!(" listenError: {}", CommonErrors::SerdeParseError);
                         break;
                     }
                 }

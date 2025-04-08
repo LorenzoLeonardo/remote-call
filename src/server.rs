@@ -72,7 +72,7 @@ pub async fn start_server() {
                             log::error!(
                                 "Invalid message from {}: {}\nStream: {:?}",
                                 socket.ip_address(),
-                                error.to_string(),
+                                error,
                                 String::from_utf8(data)
                             );
                             break;
