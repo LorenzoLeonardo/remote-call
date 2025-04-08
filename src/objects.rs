@@ -98,7 +98,7 @@ impl ListObjects {
     pub async fn wait_for_object(&mut self, msg: SocketMessage) -> SocketMessage {
         match String::from_utf8(msg.body().into()) {
             Ok(object) => {
-                if self.objects.get(object.as_str()).is_some() {
+                if self.objects.contains_key(object.as_str()) {
                     msg.set_body(SUCCESS.as_bytes())
                         .set_kind(MessageType::WaitForObject)
                 } else {
